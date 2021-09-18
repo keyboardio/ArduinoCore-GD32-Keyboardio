@@ -17,10 +17,23 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#include "USBAPI.h"
 #include "PluggableUSB.h"
 
+// EP_OUT() macro
+#include "usbd_core.h"
+// EP_CONTROL macro
+#include "usbd_lld_regs.h"
+
 using namespace arduino;
+
+const uint8_t MAX_ENDPOINTS = 9;
+
+PluggableUSB_::PluggableUSB_() {
+  this->lastIf = 0;
+  this->lastEp = 0;
+  this->rootNode = nullptr;
+  this->totalEP = MAX_ENDPOINTS;
+}
 
 int PluggableUSB_::getInterface(uint8_t* interfaceCount)
 {
@@ -98,4 +111,11 @@ PluggableUSB_& PluggableUSB()
 {
 	static PluggableUSB_ obj;
 	return obj;
+}
+
+// -> returns a pointer to the Nth element of the EP buffer structure
+void* epBuffer(unsigned int n)
+{
+	unsigned int endPoints[MAX_ENDPOINTS] = { EP_CONTROL };
+	return &(endPoints[n]);
 }
