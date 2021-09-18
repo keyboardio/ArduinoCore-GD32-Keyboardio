@@ -24,7 +24,7 @@
  * SOFTWARE.
  *****************************************************************************/
 #include "Arduino.h"
-
+#include "USBCore.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,6 +32,9 @@ extern "C" {
 void init(void)
 {
     systick_config();
+
+    // Init USB here, if available, for CDC-ACM serial.
+    usbcore_init();
 }
 
 #ifdef __cplusplus
