@@ -23,4 +23,11 @@
     #include "gd32f30x_timer.c"
     #include "gd32f30x_usart.c"
     #include "gd32f30x_wwdgt.c"
+
+    #include "usbd_pwr.c"
+    #include "usbd_enum.c"
+    #include "usbd_transc.c"
+    #include "usbd_core.c"
+    #include "usbd_lld_core.c"
+    #include "usbd_lld_int.c"
 #endif
