@@ -232,10 +232,16 @@ env.Append(
         join(FRAMEWORK_DIR, "system", spl_series + "_firmware", "CMSIS", "GD", spl_series, "Source", "GCC"),
         join(FRAMEWORK_DIR, "system", spl_series + "_firmware", spl_series + "_standard_peripheral", "Include"),
         join(FRAMEWORK_DIR, "system", spl_series + "_firmware", spl_series + "_standard_peripheral", "Source"),
-        join(FRAMEWORK_DIR, "system", spl_series + "_firmware", spl_series + "_usbd_driver", "Include"),
-        join(FRAMEWORK_DIR, "system", spl_series + "_firmware", spl_series + "_usbd_driver", "Source"),
-        join(FRAMEWORK_DIR, "system", spl_series + "_firmware", spl_series + "_usbfs_driver", "Include"),
-        join(FRAMEWORK_DIR, "system", spl_series + "_firmware", spl_series + "_usbfs_driver", "Source"),
+        join(FRAMEWORK_DIR, "system", spl_series + "_firmware", spl_series + "_usbd_library", "usbd", "Include"),
+        join(FRAMEWORK_DIR, "system", spl_series + "_firmware", spl_series + "_usbd_library", "usbd", "Source"),
+        join(FRAMEWORK_DIR, "system", spl_series + "_firmware", spl_series + "_usbd_library", "device", "Include"),
+        join(FRAMEWORK_DIR, "system", spl_series + "_firmware", spl_series + "_usbd_library", "device", "Source"),
+        join(FRAMEWORK_DIR, "system", spl_series + "_firmware", spl_series + "_usbd_library", "class", "device", "hid", "Include"),
+        join(FRAMEWORK_DIR, "system", spl_series + "_firmware", spl_series + "_usbd_library", "class", "device", "hid", "Source"),
+        # these include paths are wrong, but this way the USB full-speed library (with host support) does not interfer with the build
+        # on possible clashing headers. we need to see if we only want to select one library here (USBD or USBFS)..
+        join(FRAMEWORK_DIR, "system", spl_series + "_firmware", spl_series + "_usbfs_library", "Include"),
+        join(FRAMEWORK_DIR, "system", spl_series + "_firmware", spl_series + "_usbfs_library", "Source"),
         join(FRAMEWORK_DIR, "cores", "arduino"),
     ],
     LINKFLAGS=[
