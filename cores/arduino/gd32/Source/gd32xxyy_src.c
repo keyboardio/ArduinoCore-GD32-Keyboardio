@@ -47,7 +47,7 @@
     #include "gd32f3x0_cec.c"
     #include "gd32f3x0_cmp.c"
     #include "gd32f3x0_dac.c"
-    #endif 
+    #endif
 #elif defined(GD32F1x0)
     #include "gd32f1x0_adc.c"
     #include "gd32f1x0_cec.c"
@@ -80,3 +80,10 @@
 #else
 #error "Unknown chip series!"
 #endif
+
+#include "usbd_pwr.c"
+#include "usbd_enum.c"
+#include "usbd_transc.c"
+#include "usbd_core.c"
+#include "usbd_lld_core.c"
+#include "usbd_lld_int.c"

@@ -51,6 +51,7 @@ extern "C" {
 #include "gd32/gpio_interrupt.h"
 #include "gd32/timer.h"
 #include "gd32/rtc.h"
+#include "gd32/usb.h"
 
 #ifdef __cplusplus
 }
