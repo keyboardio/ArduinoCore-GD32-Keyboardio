@@ -32,9 +32,6 @@ extern "C" {
 void init(void)
 {
     systick_config();
-
-    // Init USB here, if available, for CDC-ACM serial.
-    usbcore_init();
 }
 
 #ifdef __cplusplus
@@ -51,6 +48,10 @@ __attribute__((constructor(101))) void premain()
 
 int main(void)
 {
+    // Init USB here, if available, for CDC-ACM serial.
+    usbcore_init();
+    usb_connect();
+
     setup();
 
     while (1) {

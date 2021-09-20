@@ -33,7 +33,7 @@ openocd:
 	$(OPENOCD_PREFIX)/bin/openocd -f interface/cmsis-dap.cfg -f target/stm32f3x.cfg
 
 gdb: build
-	$(GCC_PREFIX)/bin/arm-none-eabi-gdb -x $(HOME)/gdbinit.openocd ./build/gd32usb-test.ino.elf
+	$(GCC_PREFIX)/bin/arm-none-eabi-gdb -x gdbinit build/gd32usb-test.ino.elf
 
 serial:
 #	$(SU) stty -F $(SERIAL) min 100 time 2 hupcl -brkint -ignpar icrnl opost onlcr isig icanon echo 115200
