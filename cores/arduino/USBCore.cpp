@@ -50,7 +50,7 @@ extern "C" {
 #define STR_IDX_PRODUCT 2
 #define STR_IDX_SERIAL 3
 
-static volatile bool TX_AVAILABLE = true; // Needs atomic protection in the event of multi-core.
+static volatile bool TX_AVAILABLE = true; // TODO: Needs atomic protection in the event of multi-core.
 static uint8_t buf[USBD_EP0_MAX_SIZE];
 static uint8_t* tail = buf + sizeof(buf);
 static uint8_t* p = buf;
@@ -252,14 +252,14 @@ void usbcore_init() {
 
   old_transc_unknown = usbd.ep_transc[0][TRANSC_UNKNOWN];
   usbd.ep_transc[0][TRANSC_UNKNOWN] = transc_unknown;
-
-  usb_connect();
 }
 
 // usb_transc_config(udev->transc_in[ep_num], pbuf, buf_len, 0U);
 
+static int calls = 0;
 static usb_reqsta send_dev_config_desc(usb_dev* usbd) {
   uint8_t interfaces;
+  calls++;
 
   // TODO: need to call ‘getInterface’ twice, once to find out how
   // many interfaces there even are.
@@ -297,7 +297,8 @@ static void transc_setup(usb_dev* usbd, uint8_t ep_num) {
     // TODO: The problem!
     // Maybe just work around usbd->control.req->bRequest == USB_GET_DESCRIPTOR, bRequestType == USB_DESCTYPE_{DEV,CONFIG,STR}
     if (usbd->control.req.bRequest == USB_GET_DESCRIPTOR
-        && ((usbd->control.req.wValue >> 8) == USB_DESCTYPE_CONFIG)) {
+        && (usbd->control.req.bRequest & USB_RECPTYPE_MASK) == USB_RECPTYPE_DEV
+        && (usbd->control.req.wValue >> 8) == USB_DESCTYPE_CONFIG) {
       reqstat = send_dev_config_desc(usbd);
     } else {
       reqstat = usbd_standard_request(usbd, &usbd->control.req);
@@ -344,11 +345,10 @@ static void transc_out(usb_dev* usbd, uint8_t ep_num) {
 
 // Called in interrupt context.
 static void transc_in(usb_dev* usbd, uint8_t ep_num) {
-  // Send ZLP if necessary?
-  old_transc_in(usbd, ep_num);
-
   // Mark this endpoint’s transaction as complete.
   TX_AVAILABLE = true;
+
+  old_transc_in(usbd, ep_num);
 }
 
 static void transc_unknown(usb_dev* usbd, uint8_t ep_num) {
@@ -365,6 +365,9 @@ static inline void send_zlp(usb_dev* usbd, uint8_t ep_num) {
 int USB_SendControl(uint8_t flags, const void* d, int len)
 {
   while (len > 0) {
+    // TODO: this will break when using ‘USB_SendControl’ to calculate
+    // the config descriptor length, because ‘transc_in’ isn’t called
+    // in that circumstance.
     while (!TX_AVAILABLE) {
       // busy loop until the previous transaction was processed.
       //wfi();
