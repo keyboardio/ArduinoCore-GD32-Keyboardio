@@ -1,15 +1,17 @@
 {
-  "name": "framework-arduinogd32",
+  "name": "framework-arduinogd32-keyboardio",
   "version": "4.20000.210603",
-  "description": "Arduino Wiring-based Framework for GD32 microcontrollers",
+  "description": "Arduino Framework for Kaleidoscope keyboards with  GD32 microcontrollers",
   "keywords": [
     "framework",
     "arduino",
+    "kaleidoscope",
+    "keyboardio",
     "gigadevices",
     "gd32"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/CommunityGD32Cores/ArduinoCore-GD32"
+    "url": "https://github.com/Keyboardio/ArduinoCore-GD32-Keyboardio"
   }
 }
