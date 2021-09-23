@@ -3,48 +3,42 @@
     {
       "email": "",
       "help": {
-        "online": "https://github.com/CommunityGD32Cores/ArduinoCore-GD32"
+        "online": "https://github.com/Keyboardio/ArduinoCore-GD32-Keyboardio"
       },
-      "maintainer": "Some random folks",
-      "name": "GD32Community",
+      "maintainer": "Keyboardio",
+      "name": "keyboardio",
       "platforms": [
         {
           "architecture": "gd32",
-          "archiveFileName": "ArduinoCore-GD32-main.zip",
+          "archiveFileName": "ArduinoCore-GD32-Keyboardio-main.zip",
           "boards": [
             {
-              "name": "GD32F303ZE EVAL"
-            },
-            {
-              "name": "GD32F307VG MBED"
-            },
-            {
-              "name": "GD32F303CC Generic"
+              "name": "Keyboardio Model 100"
             }
           ],
           "category": "Contributed",
           "help": {
             "online": ""
           },
-          "name": "GigaDevice GD32",
+          "name": "Keyboardio GD32 Keyboards",
           "toolsDependencies": [
             {
-              "packager": "GD32Community",
+              "packager": "keyboardio",
               "name": "xpack-arm-none-eabi-gcc",
               "version": "9.3.1-1.3"
             },
             {
-              "packager": "GD32Community",
+              "packager": "keyboardio",
               "name": "xpack-openocd",
               "version": "0.11.0-1"
             },
             {
-              "packager": "GD32Community",
+              "packager": "keyboardio",
               "version": "0.10.0-arduino1",
               "name": "dfu-util"
             }
           ],
-          "url": "https://github.com/CommunityGD32Cores/ArduinoCore-GD32/archive/refs/heads/main.zip",
+          "url": "https://github.com/Keyboardio/ArduinoCore-GD32-Keyboardio/archive/refs/heads/main.zip",
           "version": "0.0.1"
         }
       ],
@@ -194,7 +188,7 @@
           ]
         }
       ],
-      "websiteURL": "https://github.com/CommunityGD32Cores/ArduinoCore-GD32/"
+      "websiteURL": "https://keyboard.io"
     }
   ]
 }
