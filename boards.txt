@@ -19,6 +19,7 @@ keyboardio_model_100.upload.maximum_data_size=98304
 # These two definitions set -D flags to the compiler to get the right code compiled for our MCU 
 keyboardio_model_100.build.series=GD32F30x
 keyboardio_model_100.build.product_line=GD32F30X_XD
+keyboardio_model_100.build.extra_flags='-DKALEIDOSCOPE_HARDWARE_H="Kaleidoscope-Hardware-Model100.h"' 
 
 keyboardio_model_100.build.variant=keyboardio_model_100
 keyboardio_model_100.upload.openocd_script=target/stm32f1x.cfg
