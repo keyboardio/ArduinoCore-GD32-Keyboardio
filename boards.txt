@@ -19,10 +19,16 @@ keyboardio_model_100.upload.maximum_data_size=98304
 # These two definitions set -D flags to the compiler to get the right code compiled for our MCU 
 keyboardio_model_100.build.series=GD32F30x
 keyboardio_model_100.build.product_line=GD32F30X_XD
-keyboardio_model_100.build.extra_flags='-DKALEIDOSCOPE_HARDWARE_H="Kaleidoscope-Hardware-Keyboardio-Model100.h"' 
+keyboardio_model_100.build.extra_flags='{build.usb_flags} -DKALEIDOSCOPE_HARDWARE_H="Kaleidoscope-Hardware-Keyboardio-Model100.h"' 
 
 keyboardio_model_100.build.variant=keyboardio_model_100
 keyboardio_model_100.upload.openocd_script=target/stm32f1x.cfg
+
+keyboardio_model_100.build.vid=0x3496
+keyboardio_model_100.build.pid=0x0006
+keyboardio_model_100.build.usb_product="Model 100"
+keyboardio_model_100.build.usb_manufacturer="Keyboardio"
+
 
 
 keyboardio_model_100.menu.upload_method.dfuUtilMethod=dfu-util (DFU - Keyboardio DAPBoot bootloader)
