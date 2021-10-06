@@ -19,15 +19,15 @@
 
 #include "PluggableUSB.h"
 
-using namespace arduino;
+#include "usbd_conf.h"
 
-const uint8_t MAX_ENDPOINTS = 8;
+using namespace arduino;
 
 PluggableUSB_::PluggableUSB_(uint8_t firstIf, uint8_t firstEp) {
   this->lastIf = firstIf;
   this->lastEp = firstEp;
   this->rootNode = nullptr;
-  this->totalEP = MAX_ENDPOINTS;
+  this->totalEP = EP_COUNT;
 }
 
 int PluggableUSB_::getInterface(uint8_t* interfaceCount)
