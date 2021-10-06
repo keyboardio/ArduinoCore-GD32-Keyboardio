@@ -514,6 +514,6 @@ USBCore_& USBCore()
 // -> returns a pointer to the Nth element of the EP buffer structure
 void* epBuffer(unsigned int n)
 {
-  static uint16_t endPoints[EP_COUNT] = { EPTYPE(0, USB_TRX_OUT, USB_EP_ATTR_CTL) };
+  static uint16_t endPoints[EP_COUNT] = { EPTYPE(0, USB_EP_ATTR_CTL) };
   return &(endPoints[n]);
 }
