@@ -1,10 +1,11 @@
+#include "USBCore.h"
+
 #include "api/PluggableUSB.h"
+
+#include <cstring>
 
 extern "C" {
 #include "gd32/usb.h"
-
-  // USBD_EP0_MAX_SIZE
-#include "usbd_core.h"
 
   // usb_reqsta, ENG_LANGID
 #include "usbd_enum.h"
@@ -50,23 +51,6 @@ extern "C" {
 #define STR_IDX_PRODUCT 2
 #define STR_IDX_SERIAL 3
 
-static volatile bool TX_AVAILABLE = true; // TODO: Needs atomic protection in the event of multi-core.
-static uint8_t buf[USBD_EP0_MAX_SIZE];
-static uint8_t* tail = buf + sizeof(buf);
-static uint8_t* p = buf;
-
-static void (*old_transc_setup)(usb_dev*, uint8_t);
-static void (*old_transc_out)(usb_dev*, uint8_t);
-static void (*old_transc_in)(usb_dev*, uint8_t);
-static void (*old_transc_unknown)(usb_dev*, uint8_t);
-
-static void transc_setup(usb_dev*, uint8_t);
-static void transc_out(usb_dev*, uint8_t);
-static void transc_in(usb_dev*, uint8_t);
-static void transc_unknown(usb_dev*, uint8_t);
-
-static inline void send_zlp(usb_dev*, uint8_t);
-
 static usb_desc_dev dev_desc =
   {
     .header =
@@ -74,16 +58,16 @@ static usb_desc_dev dev_desc =
       .bLength          = USB_DEV_DESC_LEN,
       .bDescriptorType  = USB_DESCTYPE_DEV
     },
-    .bcdUSB                = 0x0200U,
-    .bDeviceClass          = 0x00U,
-    .bDeviceSubClass       = 0x00U,
-    .bDeviceProtocol       = 0x00U,
+    .bcdUSB                = 0x0200,
+    .bDeviceClass          = 0x00,
+    .bDeviceSubClass       = 0x00,
+    .bDeviceProtocol       = 0x00,
     // TODO: this depends on what the mcu can support, but this is
     // device dependent code, so nevermind?
     .bMaxPacketSize0       = USBD_EP0_MAX_SIZE,
     .idVendor              = USBD_VID,
     .idProduct             = USBD_PID,
-    .bcdDevice             = 0x0100U,
+    .bcdDevice             = 0x0100,
     // Can set these to 0 so they’ll be ignored.
     .iManufacturer         = STR_IDX_MFC,
     .iProduct              = STR_IDX_PRODUCT,
@@ -144,7 +128,7 @@ static const usb_desc_str manufacturer_string =
   {
     .header =
     {
-      .bLength         = USB_STRING_LEN(10U),
+      .bLength         = USB_STRING_LEN(10),
       .bDescriptorType = USB_DESCTYPE_STR,
     },
     .unicode_string = {'G', 'i', 'g', 'a', 'D', 'e', 'v', 'i', 'c', 'e'}
@@ -155,7 +139,7 @@ static const usb_desc_str product_string =
   {
     .header =
     {
-      .bLength         = USB_STRING_LEN(17U),
+      .bLength         = USB_STRING_LEN(17),
       .bDescriptorType = USB_DESCTYPE_STR,
     },
     .unicode_string = {'D', 'e', 'v', 'T', 'e','s', 't', '-', 'P', 'l', 'u', 'g', 'g', 'a', 'b', 'l', 'e', 'U', 'S', 'B' }
@@ -166,7 +150,7 @@ static usb_desc_str serial_string =
   {
     .header =
     {
-      .bLength         = USB_STRING_LEN(12U),
+      .bLength         = USB_STRING_LEN(12),
       .bDescriptorType = USB_DESCTYPE_STR,
     }
   };
@@ -186,43 +170,67 @@ usb_desc desc = {
   .strings     = usbd_hid_strings
 };
 
-static uint8_t class_core_init(usb_dev *udev, uint8_t config_index)
+static uint8_t class_core_init(usb_dev* usbd, uint8_t config_index)
 {
+  /*
+   * Endpoint 0 is configured during startup, so skip it and only
+   * handle what’s configured by ‘PluggableUSB’.
+   */
+  for (int i = 1; i < PluggableUSB().epCount(); i++) {
+    usb_desc_ep ep_desc = {
+      .header = {
+        .bLength = sizeof(ep_desc),
+        .bDescriptorType = USB_DESCTYPE_EP,
+      },
+      .bEndpointAddress = EPTYPE_ADDR(*(uint16_t *)epBuffer(i)),
+      .bmAttributes = EPTYPE_TYPE(*(uint16_t *)epBuffer(i)),
+      .wMaxPacketSize = USBD_EP0_MAX_SIZE,
+      .bInterval = 0,
+    };
+    /*
+     * Assume all endpoints have a max packet length of
+     * ‘USBD_EP0_MAX_SIZE’ and are uni-directional.
+     */
+    uint32_t buf_addr = EP0_RX_ADDR + (i * USBD_EP0_MAX_SIZE/2);
+    usbd->drv_handler->ep_setup(usbd, EP_BUF_SNG, buf_addr, &ep_desc);
+  }
   return USBD_OK;
 }
 
-static uint8_t class_core_deinit(usb_dev *udev, uint8_t config_index)
+static uint8_t class_core_deinit(usb_dev* usbd, uint8_t config_index)
 {
+  // TODO: Called when SetConfiguration setup packet sets the configuration
+  // to 0.
   return USBD_OK;
 }
 
-static uint8_t class_core_req_handler(usb_dev *udev, usb_req *req)
+// Called when ep0 gets a SETUP packet.
+static uint8_t class_core_req_process(usb_dev* usbd, usb_req* req)
+{
+  arduino::USBSetup setup;
+  memcpy(&setup, req, sizeof(setup));
+  PluggableUSB().setup(setup);
+  return REQ_SUPP;
+}
+
+// Called when ep0 is done sending all data from an IN stage.
+static uint8_t class_core_ctlx_in(usb_dev* usbd)
 {
   return REQ_SUPP;
 }
 
-// Can’t use -- this call is immediately followed by a status out
-// stage, and the most we can do here is queue up another outgoing
-// packet after the interrupt is over.
-//
-// May actually work? ‘usb_ctl_out’ only enables reception, which we
-// shouldn’t get until the data transfer is complete.
-static uint8_t class_core_ctlx_in(usb_dev *udev)
+// Called when ep0 is done receiving all data from an OUT stage.
+static uint8_t class_core_ctlx_out(usb_dev* usbd)
 {
   return REQ_SUPP;
 }
 
-static uint8_t class_core_ctlx_out(usb_dev *udev)
-{
-  return REQ_SUPP;
-}
-
-static void class_core_data_in(usb_dev *udev, uint8_t ep_num)
+static void class_core_data_in(usb_dev* usbd, uint8_t ep_num)
 {
   return;
 }
 
-static void class_core_data_out(usb_dev *udev, uint8_t ep_num)
+static void class_core_data_out(usb_dev* usbd, uint8_t ep_num)
 {
   return;
 }
@@ -230,63 +238,176 @@ static void class_core_data_out(usb_dev *udev, uint8_t ep_num)
 usb_class class_core = {
   .req_cmd	= 0xFFU,
   .init		= class_core_init,
-  .deinit		= class_core_deinit,
-  .req_process	= class_core_req_handler,
+  .deinit	= class_core_deinit,
+  .req_process	= class_core_req_process,
   .ctlx_in	= class_core_ctlx_in,
   .ctlx_out	= class_core_ctlx_out,
   .data_in	= class_core_data_in,
   .data_out	= class_core_data_out,
 };
 
-void usbcore_init() {
-  usb_init(&desc, &class_core);
+// usb_transc_config(usbd->transc_in[ep_num], pbuf, buf_len, 0);
 
-  old_transc_setup = usbd.ep_transc[0][TRANSC_SETUP];
-  usbd.ep_transc[0][TRANSC_SETUP] = transc_setup;
-
-  old_transc_out = usbd.ep_transc[0][TRANSC_OUT];
-  usbd.ep_transc[0][TRANSC_OUT] = transc_out;
-
-  old_transc_in = usbd.ep_transc[0][TRANSC_IN];
-  usbd.ep_transc[0][TRANSC_IN] = transc_in;
-
-  old_transc_unknown = usbd.ep_transc[0][TRANSC_UNKNOWN];
-  usbd.ep_transc[0][TRANSC_UNKNOWN] = transc_unknown;
+void PacketBuf::push(uint8_t d) {
+  *this->p++ = d;
+  if (this->p == this->tail) {
+    USBCore().flush(this->ep);
+  }
 }
 
-// usb_transc_config(udev->transc_in[ep_num], pbuf, buf_len, 0U);
+USBCore_::USBCore_()
+{
+  for (int i = 0; i < EP_COUNT; i++) {
+    this->txAvailable[i] = true;
+  }
+}
 
-static int calls = 0;
-static usb_reqsta send_dev_config_desc(usb_dev* usbd) {
-  uint8_t interfaces;
-  calls++;
+void USBCore_::init()
+{
+  usb_init(&desc, &class_core);
+  usbd.user_data = this;
 
-  // TODO: need to call ‘getInterface’ twice, once to find out how
-  // many interfaces there even are.
-  const uint8_t config_header[] = {
-    // bLength, bDescriptorType
-    9, 2,
+  this->old_transc_setup = usbd.ep_transc[0][TRANSC_SETUP];
+  usbd.ep_transc[0][TRANSC_SETUP] = USBCore_::_transc_setup;
 
-    // wTotalLength, bNumInterfaces, bConfigurationValue, iConfiguration
-    25, 0, 1, 1, 0,
+  this->old_transc_out = usbd.ep_transc[0][TRANSC_OUT];
+  usbd.ep_transc[0][TRANSC_OUT] = USBCore_::_transc_out;
 
-    // bmAttributes, bMaxPower
-    0b10000000, 50,
-  };
-  USB_SendControl(0, &config_header, sizeof(config_header));
-  PluggableUSB().getInterface(&interfaces);
-  USB_Flush(0);
-  return REQ_SUPP;
+  this->old_transc_in = usbd.ep_transc[0][TRANSC_IN];
+  usbd.ep_transc[0][TRANSC_IN] = USBCore_::_transc_in;
+
+  this->old_transc_unknown = usbd.ep_transc[0][TRANSC_UNKNOWN];
+  usbd.ep_transc[0][TRANSC_UNKNOWN] = USBCore_::_transc_unknown;
+}
+
+// Send ‘len’ octets of ‘d’ through the control pipe (endpoint 0).
+// Blocks until ‘len’ octets are sent. Returns the number of octets
+// sent, or -1 on error.
+int USBCore_::sendControl(uint8_t flags, const void* d, int len)
+{
+  int wrote = 0;
+
+  while (wrote < len) {
+    // TODO: this will break when using ‘USB_SendControl’ to calculate
+    // the config descriptor length, because ‘transc_in’ isn’t called
+    // in that circumstance.
+
+    // usb_transc_config(usbd->transc_in[0], p, len, 0);
+    for (; this->p < this->tail && len > 0; wrote++) {
+      *this->p++ = *(uint8_t *)d++;
+    }
+    this->flush(0);
+  }
+
+  // Send a ZLP only when we’re done with the data transmission and
+  // the final transmission is exactly the max packet size.
+  if (wrote % sizeof(this->buf) == 0) {
+    // TODO: check to see if we need ‘sendZLP’ here, or if
+    // ‘transc_in’ will be called even when a ZLP is sent.
+    //
+    // If ‘transc_in’ is called, then this is going to be the more
+    // correct behavior, because it waits for the transaction to
+    // complete before allowing further ones.
+    this->flush(0);
+  }
+
+  return wrote;
+}
+
+// Does not timeout or cross fifo boundaries. Returns the number of
+// octets read.
+int USBCore_::recvControl(void* d, int len)
+{
+  return -1;
+}
+
+// TODO: no idea? this isn’t in the avr 1.8.2 library, although it has
+// the function prototype.
+int USBCore_::recvControlLong(void* d, int len)
+{
+  return -1;
+}
+
+// Number of octets available on OUT endpoint.
+uint8_t USBCore_::available(uint8_t ep)
+{
+  return 0;
+}
+
+// Space left in IN endpoint buffer.
+uint8_t USBCore_::sendSpace(uint8_t ep)
+{
+  return this->tail - this->p;
+}
+
+// Blocking send of data to an endpoint. Returns the number of octets
+// sent, or -1 on error.
+int USBCore_::send(uint8_t ep, const void* d, int len)
+{
+  return -1;
+}
+
+// Non-blocking receive. Returns the number of octets read, or -1 on
+// error.
+int USBCore_::recv(uint8_t ep, void* d, int len)
+{
+  return -1;
+}
+
+// Receive one octet from OUT endpoint ‘ep’. Returns -1 if no bytes
+// available.
+int USBCore_::recv(uint8_t ep)
+{
+  return -1;
+}
+
+// Flushes an outbound transmission as soon as possible.
+int USBCore_::flush(uint8_t ep)
+{
+  // TODO: this is broken: we’re flushing to an endpoint with ‘buf’
+  // and ‘p’, which is not per-endpoint.
+  while (!this->txAvailable[0]) {
+    // busy loop until the previous transaction was processed.
+    //wfi();
+  }
+
+  this->txAvailable[ep] = false;
+  usbd.drv_handler->ep_write(buf, ep, p-buf);
+  this->p = this->buf;
+}
+
+void USBCore_::_transc_setup(usb_dev* usbd, uint8_t ep)
+{
+  USBCore_* core = (USBCore_ *)usbd->user_data;
+  core->transc_setup(usbd, ep);
+}
+
+void USBCore_::_transc_out(usb_dev* usbd, uint8_t ep)
+{
+  USBCore_* core = (USBCore_ *)usbd->user_data;
+  core->transc_out(usbd, ep);
+}
+
+void USBCore_::_transc_in(usb_dev* usbd, uint8_t ep)
+{
+  USBCore_* core = (USBCore_ *)usbd->user_data;
+  core->transc_in(usbd, ep);
+}
+
+void USBCore_::_transc_unknown(usb_dev* usbd, uint8_t ep)
+{
+  USBCore_* core = (USBCore_ *)usbd->user_data;
+  core->transc_unknown(usbd, ep);
 }
 
 // Called in interrupt context.
-static void transc_setup(usb_dev* usbd, uint8_t ep_num) {
+void USBCore_::transc_setup(usb_dev* usbd, uint8_t ep) {
   usb_reqsta reqstat = REQ_NOTSUPP;
 
-  uint16_t count = usbd->drv_handler->ep_read((uint8_t *)(&usbd->control.req), 0U, (uint8_t)EP_BUF_SNG);
+  uint16_t count = usbd->drv_handler->ep_read((uint8_t *)(&usbd->control.req), 0, (uint8_t)EP_BUF_SNG);
 
   if (count != USB_SETUP_PACKET_LEN) {
-    usbd_ep_stall(usbd, 0x0U);
+    usbd_ep_stall(usbd, 0);
 
     return;
   }
@@ -299,7 +420,8 @@ static void transc_setup(usb_dev* usbd, uint8_t ep_num) {
     if (usbd->control.req.bRequest == USB_GET_DESCRIPTOR
         && (usbd->control.req.bRequest & USB_RECPTYPE_MASK) == USB_RECPTYPE_DEV
         && (usbd->control.req.wValue >> 8) == USB_DESCTYPE_CONFIG) {
-      reqstat = send_dev_config_desc(usbd);
+      this->sendDeviceConfigDescriptor(usbd);
+      reqstat = REQ_SUPP;
     } else {
       reqstat = usbd_standard_request(usbd, &usbd->control.req);
     }
@@ -321,127 +443,77 @@ static void transc_setup(usb_dev* usbd, uint8_t ep_num) {
     break;
   }
 
-  if (REQ_SUPP == reqstat) {
-    if (0U == usbd->control.req.wLength) {
+  if (reqstat == REQ_SUPP) {
+    if (usbd->control.req.wLength == 0) {
       /* USB control transfer status in stage */
-      send_zlp(usbd, 0);
+      this->sendZLP(usbd, 0);
     } else {
-      if (usbd->control.req.bmRequestType & 0x80U) {
-        usbd_ep_send(usbd, 0U, usbd->transc_in[0].xfer_buf, usbd->transc_in[0].xfer_len);
+      if (usbd->control.req.bmRequestType & USB_TRX_IN) {
+        usbd_ep_send(usbd, 0, usbd->transc_in[0].xfer_buf, usbd->transc_in[0].xfer_len);
       } else {
         /* USB control transfer data out stage */
-        usbd->drv_handler->ep_rx_enable(usbd, 0U);
+        usbd->drv_handler->ep_rx_enable(usbd, 0);
       }
     }
   } else {
-    usbd_ep_stall(usbd, 0x0U);
+    usbd_ep_stall(usbd, 0);
   }
 }
 
 // Called in interrupt context.
-static void transc_out(usb_dev* usbd, uint8_t ep_num) {
-  old_transc_out(usbd, ep_num);
+void USBCore_::transc_out(usb_dev* usbd, uint8_t ep) {
+  this->old_transc_out(usbd, ep);
 }
 
 // Called in interrupt context.
-static void transc_in(usb_dev* usbd, uint8_t ep_num) {
+void USBCore_::transc_in(usb_dev* usbd, uint8_t ep) {
   // Mark this endpoint’s transaction as complete.
-  TX_AVAILABLE = true;
+  this->txAvailable[ep] = true;
 
-  old_transc_in(usbd, ep_num);
+  this->old_transc_in(usbd, ep);
 }
 
-static void transc_unknown(usb_dev* usbd, uint8_t ep_num) {
-  old_transc_unknown(usbd, ep_num);
+void USBCore_::transc_unknown(usb_dev* usbd, uint8_t ep) {
+  this->old_transc_unknown(usbd, ep);
 }
 
-static inline void send_zlp(usb_dev* usbd, uint8_t ep_num) {
+// TODO: make the device descriptor a member variable which can be
+// overridden by subclasses.
+void USBCore_::sendDeviceConfigDescriptor(usb_dev* usbd)
+{
+  uint8_t interfaces;
+
+  // TODO: need to call ‘getInterface’ twice, once to find out how
+  // many interfaces there even are.
+  const uint8_t configHeader[] = {
+    // bLength, bDescriptorType
+    9, 2,
+
+    // wTotalLength, bNumInterfaces, bConfigurationValue, iConfiguration
+    25, 0, 1, 1, 0,
+
+    // bmAttributes, bMaxPower
+    0b10000000, 50,
+  };
+  this->sendControl(0, &configHeader, sizeof(configHeader));
+  PluggableUSB().getInterface(&interfaces);
+  this->flush(0);
+}
+
+void USBCore_::sendZLP(usb_dev* usbd, uint8_t ep)
+{
   usbd->drv_handler->ep_write(nullptr, 0, 0);
 }
 
-// Send ‘len’ octets of ‘d’ through the control pipe (endpoint 0).
-// Blocks until ‘len’ octets are sent. Returns the number of octets
-// sent, or -1 on error.
-int USB_SendControl(uint8_t flags, const void* d, int len)
+USBCore_& USBCore()
 {
-  while (len > 0) {
-    // TODO: this will break when using ‘USB_SendControl’ to calculate
-    // the config descriptor length, because ‘transc_in’ isn’t called
-    // in that circumstance.
-    while (!TX_AVAILABLE) {
-      // busy loop until the previous transaction was processed.
-      //wfi();
-    }
-
-    // usb_transc_config(udev->transc_in[0], p, len, 0U);
-    for (; p < tail && len > 0; p++, len--) {
-      *p = *(uint8_t *)d;
-      d++;
-    }
-
-    if (p == tail) {
-      if (len == 0) {
-        // TODO: Send ZLP after the previous packet finishes. Mark the
-        // transaction as needing a zlp when done.
-      }
-      USB_Flush(0);
-      p = buf;
-    }
-  }
-
-  return len;
+  static USBCore_ core;
+  return core;
 }
 
-// Does not timeout or cross fifo boundaries. Returns the number of
-// octets read.
-int USB_RecvControl(void* d, int len)
+// -> returns a pointer to the Nth element of the EP buffer structure
+void* epBuffer(unsigned int n)
 {
-  return -1;
-}
-
-// TODO: no idea? this isn’t in the avr 1.8.2 library, although it has
-// the function prototype.
-int USB_RecvControlLong(void* d, int len)
-{
-  return -1;
-}
-
-// Number of octets available on OUT endpoint.
-uint8_t USB_Available(uint8_t ep)
-{
-  return 0;
-}
-
-// Space left in IN endpoint buffer.
-uint8_t USB_SendSpace(uint8_t ep)
-{
-  return tail-p;
-}
-
-// Blocking send of data to an endpoint. Returns the number of octets
-// sent, or -1 on error.
-int USB_Send(uint8_t ep, const void* d, int len)
-{
-  return -1;
-}
-
-// Non-blocking receive. Returns the number of octets read, or -1 on
-// error.
-int USB_Recv(uint8_t ep, void* d, int len)
-{
-  return -1;
-}
-
-// Receive one octet from OUT endpoint ‘ep’. Returns -1 if no bytes
-// available.
-int USB_Recv(uint8_t ep)
-{
-  return -1;
-}
-
-// Flushes an outbound transaction unconditionally.
-void USB_Flush(uint8_t ep) {
-  // TODO: set up transaction.
-  TX_AVAILABLE = false;
-  usbd.drv_handler->ep_write(buf, ep, p-buf);
+  static uint16_t endPoints[EP_COUNT] = { EPTYPE(0, USB_TRX_OUT, USB_EP_ATTR_CTL) };
+  return &(endPoints[n]);
 }
