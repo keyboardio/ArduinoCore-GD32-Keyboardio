@@ -7,7 +7,7 @@ TestPlug tp;
 
 TestPlug::TestPlug() : arduino::PluggableUSBModule(1, 1, epType) {
   PluggableUSB().plug(this);
-  epType[0] = EPTYPE(this->pluggedEndpoint, USB_TRX_IN, USB_EP_ATTR_INT);
+  this->epType[0] = EPTYPE(EP_IN(this->pluggedEndpoint), USB_EP_ATTR_INT);
 }
 
 int TestPlug::getInterface(uint8_t* interfaceNum) {
@@ -19,7 +19,7 @@ int TestPlug::getInterface(uint8_t* interfaceNum) {
     9, 4,
 
     // bInterfaceNumber, bAlternateSetting, bNumEndpoints
-    0, 0, 1,
+    this->pluggedInterface, 0, 1,
 
     // bInterfaceClass, bInterfaceSubClass, bInterfaceProtocol
     3, 1, 1,
@@ -34,7 +34,7 @@ int TestPlug::getInterface(uint8_t* interfaceNum) {
     7, 5,
 
     // bEndpointAddress, bmAttributes, wMaxPacketSize, bInterval
-    USB_TRX_IN | this->pluggedEndpoint, 0b00000011, 8, 0, 64,
+    EP_IN(this->pluggedEndpoint), 0b00000011, 64, 0, 8,
   };
   return USB_SendControl(0, desc, sizeof(desc));
 }
