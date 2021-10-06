@@ -49,7 +49,7 @@ __attribute__((constructor(101))) void premain()
 int main(void)
 {
     // Init USB here, if available, for CDC-ACM serial.
-    usbcore_init();
+    USBCore().init();
     usb_connect();
 
     setup();

@@ -19,103 +19,100 @@
 
 #include "PluggableUSB.h"
 
-// EP_OUT() macro
-#include "usbd_core.h"
-// EP_CONTROL macro
-#include "usbd_lld_regs.h"
-
 using namespace arduino;
 
-const uint8_t MAX_ENDPOINTS = 9;
+const uint8_t MAX_ENDPOINTS = 8;
 
-PluggableUSB_::PluggableUSB_() {
-  this->lastIf = 0;
-  this->lastEp = 0;
+PluggableUSB_::PluggableUSB_(uint8_t firstIf, uint8_t firstEp) {
+  this->lastIf = firstIf;
+  this->lastEp = firstEp;
   this->rootNode = nullptr;
   this->totalEP = MAX_ENDPOINTS;
 }
 
 int PluggableUSB_::getInterface(uint8_t* interfaceCount)
 {
-	int sent = 0;
-	PluggableUSBModule* node;
-	for (node = rootNode; node; node = node->next) {
-		int res = node->getInterface(interfaceCount);
-		if (res < 0)
-			return -1;
-		sent += res;
-	}
-	return sent;
+  int sent = 0;
+  PluggableUSBModule* node;
+  for (node = rootNode; node; node = node->next) {
+    int res = node->getInterface(interfaceCount);
+    if (res < 0)
+      return -1;
+    sent += res;
+  }
+  return sent;
 }
 
 int PluggableUSB_::getDescriptor(USBSetup& setup)
 {
-	PluggableUSBModule* node;
-	for (node = rootNode; node; node = node->next) {
-		int ret = node->getDescriptor(setup);
-		// ret!=0 -> request has been processed
-		if (ret)
-			return ret;
-	}
-	return 0;
+  PluggableUSBModule* node;
+  for (node = rootNode; node; node = node->next) {
+    int ret = node->getDescriptor(setup);
+    // ret!=0 -> request has been processed
+    if (ret)
+      return ret;
+  }
+  return 0;
 }
 
 void PluggableUSB_::getShortName(char *iSerialNum)
 {
-	PluggableUSBModule* node;
-	for (node = rootNode; node; node = node->next) {
-		iSerialNum += node->getShortName(iSerialNum);
-	}
-	*iSerialNum = 0;
+  PluggableUSBModule* node;
+  for (node = rootNode; node; node = node->next) {
+    iSerialNum += node->getShortName(iSerialNum);
+  }
+  *iSerialNum = 0;
 }
 
 bool PluggableUSB_::setup(USBSetup& setup)
 {
-	PluggableUSBModule* node;
-	for (node = rootNode; node; node = node->next) {
-		if (node->setup(setup)) {
-			return true;
-		}
-	}
-	return false;
+  PluggableUSBModule* node;
+  for (node = rootNode; node; node = node->next) {
+    if (node->setup(setup)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool PluggableUSB_::plug(PluggableUSBModule *node)
 {
-	if ((lastEp + node->numEndpoints) > totalEP) {
-		return false;
-	}
+  if ((lastEp + node->numEndpoints) > totalEP) {
+    return false;
+  }
 
-	if (!rootNode) {
-		rootNode = node;
-	} else {
-		PluggableUSBModule *current = rootNode;
-		while (current->next) {
-			current = current->next;
-		}
-		current->next = node;
-	}
+  if (!rootNode) {
+    rootNode = node;
+  } else {
+    PluggableUSBModule *current = rootNode;
+    while (current->next) {
+      current = current->next;
+    }
+    current->next = node;
+  }
 
-	node->pluggedInterface = lastIf;
-	node->pluggedEndpoint = lastEp;
-	lastIf += node->numInterfaces;
-	for (uint8_t i = 0; i < node->numEndpoints; i++) {
-		*(unsigned int*)(epBuffer(lastEp)) = node->endpointType[i];
-		lastEp++;
-	}
-	return true;
-	// restart USB layer???
+  node->pluggedInterface = lastIf;
+  node->pluggedEndpoint = lastEp;
+  lastIf += node->numInterfaces;
+  for (uint8_t i = 0; i < node->numEndpoints; i++) {
+    *(unsigned int*)(epBuffer(lastEp)) = node->endpointType[i];
+    lastEp++;
+  }
+  return true;
+  // restart USB layer???
+}
+
+uint8_t PluggableUSB_::ifCount() {
+  return this->lastIf;
+}
+
+uint8_t PluggableUSB_::epCount() {
+  return this->lastEp;
 }
 
 PluggableUSB_& PluggableUSB()
 {
-	static PluggableUSB_ obj;
-	return obj;
-}
-
-// -> returns a pointer to the Nth element of the EP buffer structure
-void* epBuffer(unsigned int n)
-{
-	unsigned int endPoints[MAX_ENDPOINTS] = { EP_CONTROL };
-	return &(endPoints[n]);
+  // Start after the control endpoint.
+  static PluggableUSB_ obj(0, 1);
+  return obj;
 }
