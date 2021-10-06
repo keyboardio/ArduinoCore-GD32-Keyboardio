@@ -10,10 +10,8 @@ extern "C" {
  * Macros for encoding the endpoint into a 16-bit integer containing
  * the endpoint’s number, direction, and type.
  */
-#define EPTYPE(ep, dir, type) (((dir | ep) << 8) | type)
+#define EPTYPE(addr, type) ((addr << 8) | type)
 #define EPTYPE_ADDR(eptype) (eptype >> 8)
-#define EPTYPE_EP(eptype) (EPTYPE_ADDR(eptype) & ~USB_TRX_MASK)
-#define EPTYPE_DIR(eptype) (EPTYPE_ADDR(eptype) & USB_TRX_MASK)
 #define EPTYPE_TYPE(eptype) (eptype & 0xff)
 
 /*
