@@ -42,8 +42,11 @@ OF SUCH DAMAGE.
 #include "variant.h"
 
 
-/* define if low power mode is enabled; it allows entering the device into DEEP_SLEEP mode
-   following USB suspend event and wakes up after the USB wakeup event is received. */
+/*
+ * define if low power mode is enabled; it allows entering the device
+ * into DEEP_SLEEP mode following USB suspend event and wakes up after
+ * the USB wakeup event is received.
+ */
 #define USBD_LOWPWR_MODE_ENABLE
 
 /* USB feature -- Self Powered */
@@ -65,14 +68,27 @@ OF SUCH DAMAGE.
 
 #define USB_STRING_COUNT 4U
 
-/* endpoint0, Rx/Tx buffers address offset */
-#define EP0_TX_ADDR 0x20U
-#define EP0_RX_ADDR 0x40U
+/*
+ * Offset from USBD RAM base used to store endpoint buffer
+ * descriptors.
+ *
+ * cf. GD32F30x User Manual §26.6.1.
+ */
+#define BTABLE_OFFSET 0
 
-#define INT_TX_ADDR 0x50U
-#define INT_RX_ADDR 0x60U
-
-/* base address of the allocation buffer, used for buffer descriptor table and packet memory */
-#define BTABLE_OFFSET (0x0000U)
+/*
+ * Offsets from BTABLE in the peripheral for transmission and
+ * reception buffers.
+ *
+ * These offsets are stored directly in the ‘USBD_EPxTBADDR’ and
+ * ‘USBD_EPxRBADDR’ registers, and thus are half the real offset used
+ * when accessing the data buffer.
+ *
+ * Other endpoint buffers are come after ‘EP0_RX_ADDR’, and assume the
+ * maximum packet size is the same for all endpoints, at
+ * ‘USBD_EP0_MAX_SIZE’ octets.
+ */
+#define EP0_TX_ADDR 0x20
+#define EP0_RX_ADDR (0x40+(USBD_EP0_MAX_SIZE/2))
 
 #endif /* __USBD_CONF_H */

@@ -1,12 +1,13 @@
 #include "TestPlug.h"
+#include "USBCore.h"
 
 #include <cstring>
 
 TestPlug tp;
 
 TestPlug::TestPlug() : arduino::PluggableUSBModule(1, 1, epType) {
-  epType[0] = EP_TYPE_INTERRUPT_IN;
   PluggableUSB().plug(this);
+  epType[0] = EPTYPE(this->pluggedEndpoint, USB_TRX_IN, USB_EP_ATTR_INT);
 }
 
 int TestPlug::getInterface(uint8_t* interfaceNum) {
@@ -33,7 +34,7 @@ int TestPlug::getInterface(uint8_t* interfaceNum) {
     7, 5,
 
     // bEndpointAddress, bmAttributes, wMaxPacketSize, bInterval
-    0b10000001, 0b00000011, 8, 0, 64,
+    USB_TRX_IN | this->pluggedEndpoint, 0b00000011, 8, 0, 64,
   };
   return USB_SendControl(0, desc, sizeof(desc));
 }
@@ -42,7 +43,6 @@ int TestPlug::getDescriptor(arduino::USBSetup& setup) {
   return 0;
 }
 
-// Not sure what this does.
 bool TestPlug::setup(arduino::USBSetup& setup) {
   return false;
 }
