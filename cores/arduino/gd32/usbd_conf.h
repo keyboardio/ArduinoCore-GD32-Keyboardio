@@ -41,7 +41,6 @@ OF SUCH DAMAGE.
 // TODO: think about how to file this away and include it.
 #include "variant.h"
 
-
 /*
  * define if low power mode is enabled; it allows entering the device
  * into DEEP_SLEEP mode following USB suspend event and wakes up after
