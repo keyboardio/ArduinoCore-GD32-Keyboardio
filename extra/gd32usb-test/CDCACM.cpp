@@ -1,6 +1,8 @@
 #include "CDCACM.h"
 #include "USBCore.h"
 
+CDCACM cdcacm;
+
 /* class-specific notification codes for PSTN subclasses */
 #define USB_CDC_NOTIFY_SERIAL_STATE 0x20
 
@@ -16,10 +18,10 @@
 #define NO_CMD                    0xFF
 
 CDCACM::CDCACM() : arduino::PluggableUSBModule(2, 3, epType) {
+  this->epType[0] = EPTYPE(USB_TRX_IN, USB_EP_ATTR_INT);
+  this->epType[1] = EPTYPE(USB_TRX_OUT, USB_EP_ATTR_BULK);
+  this->epType[2] = EPTYPE(USB_TRX_IN, USB_EP_ATTR_BULK);
   PluggableUSB().plug(this);
-  this->epType[0] = EPTYPE(EP_IN(this->pluggedEndpoint), USB_EP_ATTR_INT);
-  this->epType[1] = EPTYPE(EP_OUT(this->pluggedEndpoint+1), USB_EP_ATTR_BULK);
-  this->epType[2] = EPTYPE(EP_IN(this->pluggedEndpoint+2), USB_EP_ATTR_BULK);
 }
 
 int CDCACM::getInterface(uint8_t* interfaceCount)
@@ -85,7 +87,7 @@ int CDCACM::getInterface(uint8_t* interfaceCount)
     7, 5,
 
     // bEndpointAddress, bmAttributes, wMaxPacketSize, bInterval
-    EPTYPE_ADDR(this->epType[0]), EPTYPE_TYPE(this->epType[0]), 64, 0, 8,
+    EPTYPE_DIR(this->epType[0]) | this->pluggedEndpoint, EPTYPE_TYPE(this->epType[0]), 64, 0, 8,
 
     /*
      * CDC data interface
@@ -109,7 +111,7 @@ int CDCACM::getInterface(uint8_t* interfaceCount)
     7, 5,
 
     // bEndpointAddress, bmAttributes, wMaxPacketSize, bInterval
-    EPTYPE_ADDR(this->epType[1]), EPTYPE_TYPE(this->epType[1]), 64, 0, 0,
+    EPTYPE_DIR(this->epType[1]) | this->pluggedEndpoint+1, EPTYPE_TYPE(this->epType[1]), 64, 0, 0,
 
     /*
      * Endpoint 3 - data in
@@ -118,7 +120,7 @@ int CDCACM::getInterface(uint8_t* interfaceCount)
     7, 5,
 
     // bEndpointAddress, bmAttributes, wMaxPacketSize, bInterval
-    EPTYPE_ADDR(this->epType[2]), EPTYPE_TYPE(this->epType[2]), 64, 0, 0,
+    EPTYPE_DIR(this->epType[2]) | this->pluggedEndpoint+2, EPTYPE_TYPE(this->epType[2]), 64, 0, 0,
   };
   return USB_SendControl(0, &desc, sizeof(desc));
 }

@@ -8,10 +8,10 @@ extern "C" {
 
 /*
  * Macros for encoding the endpoint into a 16-bit integer containing
- * the endpoint’s number, direction, and type.
+ * the endpoint’s direction, and type.
  */
-#define EPTYPE(addr, type) ((addr << 8) | type)
-#define EPTYPE_ADDR(eptype) (eptype >> 8)
+#define EPTYPE(dir, type) ((dir << 8) | type)
+#define EPTYPE_DIR(eptype) (eptype >> 8)
 #define EPTYPE_TYPE(eptype) (eptype & 0xff)
 
 /*
@@ -69,10 +69,12 @@ public:
   int flush(uint8_t ep);
 
 private:
-  volatile bool txAvailable[EP_COUNT];
   uint8_t buf[USBD_EP0_MAX_SIZE];
   uint8_t* tail = buf + sizeof(buf);
   uint8_t* p = buf;
+  // TODO: verify that this only applies to the control endpoint’s use of wLength
+  // I think this is only on the setup packet, so it should be fine.
+  uint16_t maxWrite = 0;
 
   /*
    * Pointers to the transaction routines specified by ‘usbd_init’.
