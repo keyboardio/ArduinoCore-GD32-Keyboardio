@@ -1,47 +1,19 @@
 #include "USBCore.h"
 
-#include "api/PluggableUSB.h"
-
-#include <cstring>
+#include "Arduino.h"
 
 extern "C" {
 #include "gd32/usb.h"
-
-  // usb_reqsta, ENG_LANGID
 #include "usbd_enum.h"
+#include "usbd_lld_regs.h"
 }
 
-// USBD_EP0_MAX_SIZE from ‘usbd_core.h’ is max packet length.
-// the usb_transc structure (ibid) has it per-endpoint in ‘max_len’.
-// Can use ‘udev->usb_ep_transc(udev, endpoint_num)’ to get it.
-
-// NB: cannot use actual transactions because they will send data at
-// the end of the buffer, and we need to collect it across multiple
-// calls to ‘USB_SendControl‘. To that end, we can write directly into
-// its EP buffer, then, if we’re at maxPacketLen, send it (via
-// USB_flush?) and then wait for the buffer to become clear again so
-// we can continue writing to it.
-//
-// Looks like ‘udev->ep_status(udev, endpoint_num)’ can be used. Seems
-// like true values indicate ready-to-send/receive.
-//
-// Ideally, we’d copy straight into USB RAM, but since ‘btable_ep’ is
-// hidden inside ‘usbd_lld_core’, we’d have to use the same constants
-// it does, which is perhaps poor from a code-duplication standpoint?
-// But then again, it is literally how the chip works according to the
-// data sheet:
-//
-// USBD_RAM + 2 * (BTABLE_OFFSET & 0xFFF8)
-//
-// Never-the-less, it would be better to get this from the firmware
-// library.
-//
-// Actually, since we have to bypass usbd_ep_data_write anyway, I
-// think we’re going to have to copy straight into this buffer.
-
-// We can use buf for zero-copy by way of ‘usbd_ep_init’ from
-// ‘usb_core.h’. This isn’t used for endpoint 0 for some reason in the
-// extant code, but there’s no reason it shouldn’t work.
+/*
+ * TODO: remove these debugging watchpoints.
+ */
+bool configdesc = false;
+bool flushcalled = false;
+bool shouldbreak = false;
 
 #define USBD_VID 0xdead
 #define USBD_PID 0xbeef
@@ -51,121 +23,90 @@ extern "C" {
 #define STR_IDX_PRODUCT 2
 #define STR_IDX_SERIAL 3
 
-static usb_desc_dev dev_desc =
-  {
-    .header =
-    {
-      .bLength          = USB_DEV_DESC_LEN,
-      .bDescriptorType  = USB_DESCTYPE_DEV
-    },
-    .bcdUSB                = 0x0200,
-    .bDeviceClass          = 0x00,
-    .bDeviceSubClass       = 0x00,
-    .bDeviceProtocol       = 0x00,
-    // TODO: this depends on what the mcu can support, but this is
-    // device dependent code, so nevermind?
-    .bMaxPacketSize0       = USBD_EP0_MAX_SIZE,
-    .idVendor              = USBD_VID,
-    .idProduct             = USBD_PID,
-    .bcdDevice             = 0x0100,
-    // Can set these to 0 so they’ll be ignored.
-    .iManufacturer         = STR_IDX_MFC,
-    .iProduct              = STR_IDX_PRODUCT,
-    .iSerialNumber         = STR_IDX_SERIAL,
-    // TODO: for PluggableUSB, should probably be 1. Configured in
-    // usbd_conf.h
-    .bNumberConfigurations = USBD_CFG_MAX_NUM
-  };
+// TODO: make the device descriptor a member variable which can be
+// overridden by subclasses.
+static usb_desc_dev devDesc = {
+  .header = {
+    .bLength          = USB_DEV_DESC_LEN,
+    .bDescriptorType  = USB_DESCTYPE_DEV
+  },
+  .bcdUSB                = 0x0200,
+  .bDeviceClass          = 0x00,
+  .bDeviceSubClass       = 0x00,
+  .bDeviceProtocol       = 0x00,
+  // TODO: this depends on what the mcu can support, but this is
+  // device dependent code, so nevermind?
+  .bMaxPacketSize0       = USBD_EP0_MAX_SIZE,
+  .idVendor              = USBD_VID,
+  .idProduct             = USBD_PID,
+  .bcdDevice             = 0x0100,
+  // Can set these to 0 so they’ll be ignored.
+  .iManufacturer         = STR_IDX_MFC,
+  .iProduct              = STR_IDX_PRODUCT,
+  .iSerialNumber         = STR_IDX_SERIAL,
+  // TODO: for PluggableUSB, should probably be 1. Configured in
+  // usbd_conf.h
+  .bNumberConfigurations = 1
+};
 
-static uint8_t config_desc[] = {
-  // bLength, bDescriptorType
-  9, 2,
-
-  // wTotalLength, bNumInterfaces, bConfigurationValue, iConfiguration
-  25, 0, 1, 1, 0,
-
-  // bmAttributes, bMaxPower
-  0b10000000, 50,
-
-  /*
-   * Interface 1
-   */
-  // bLength, bDescriptorType
-  9, 4,
-
-  // bInterfaceNumber, bAlternateSetting, bNumEndpoints
-  0, 0, 1,
-
-  // bInterfaceClass, bInterfaceSubClass, bInterfaceProtocol
-  3, 1, 1,
-
-  // iInterface
-  0,
-
-  /*
-   * Endpoint 1
-   */
-  // bLength, bDescriptorType
-  7, 5,
-
-  // bEndpointAddress, bmAttributes, wMaxPacketSize, bInterval
-  0b10000001, 0b00000011, 8, 0, 64,
+usb_desc_config configDesc = {
+  .header = {
+    .bLength = sizeof(usb_desc_config),
+    .bDescriptorType = USB_DESCTYPE_CONFIG
+  },
+  .wTotalLength = 0,
+  .bNumInterfaces = 0,
+  .bConfigurationValue = 1,
+  .iConfiguration = 0,
+  .bmAttributes = 0b100000000,
+  .bMaxPower = 50
 };
 
 /* USB language ID Descriptor */
-const usb_desc_LANGID usbd_language_id_desc =
-  {
-    .header =
-    {
-      .bLength         = sizeof(usb_desc_LANGID),
-      .bDescriptorType = USB_DESCTYPE_STR
-    },
-    .wLANGID              = ENG_LANGID
-  };
+const usb_desc_LANGID usbd_language_id_desc = {
+  .header = {
+    .bLength         = sizeof(usb_desc_LANGID),
+    .bDescriptorType = USB_DESCTYPE_STR
+  },
+  .wLANGID = ENG_LANGID
+};
 
 /* USB manufacture string */
-static const usb_desc_str manufacturer_string =
-  {
-    .header =
-    {
-      .bLength         = USB_STRING_LEN(10),
-      .bDescriptorType = USB_DESCTYPE_STR,
-    },
-    .unicode_string = {'G', 'i', 'g', 'a', 'D', 'e', 'v', 'i', 'c', 'e'}
-  };
+static const usb_desc_str manufacturer_string = {
+  .header = {
+    .bLength         = USB_STRING_LEN(7),
+    .bDescriptorType = USB_DESCTYPE_STR,
+  },
+  .unicode_string = {'A', 'r', 'd', 'u', 'i', 'n', 'o'}
+};
 
 /* USB product string */
-static const usb_desc_str product_string =
-  {
-    .header =
-    {
-      .bLength         = USB_STRING_LEN(17),
-      .bDescriptorType = USB_DESCTYPE_STR,
-    },
-    .unicode_string = {'D', 'e', 'v', 'T', 'e','s', 't', '-', 'P', 'l', 'u', 'g', 'g', 'a', 'b', 'l', 'e', 'U', 'S', 'B' }
-  };
+static const usb_desc_str product_string = {
+  .header = {
+    .bLength         = USB_STRING_LEN(8),
+    .bDescriptorType = USB_DESCTYPE_STR,
+  },
+  .unicode_string = {'U', 'S', 'B', ' ', 't', 'e', 's', 't'}
+};
 
 /* USBD serial string */
-static usb_desc_str serial_string =
-  {
-    .header =
-    {
-      .bLength         = USB_STRING_LEN(12),
-      .bDescriptorType = USB_DESCTYPE_STR,
-    }
-  };
+static usb_desc_str serial_string = {
+  .header = {
+    .bLength         = USB_STRING_LEN(12),
+    .bDescriptorType = USB_DESCTYPE_STR,
+  }
+};
 
-static uint8_t* usbd_hid_strings[] =
-  {
-    [STR_IDX_LANGID]  = (uint8_t *)&usbd_language_id_desc,
-    [STR_IDX_MFC]     = (uint8_t *)&manufacturer_string,
-    [STR_IDX_PRODUCT] = (uint8_t *)&product_string,
-    [STR_IDX_SERIAL]  = (uint8_t *)&serial_string
-  };
+static uint8_t* usbd_hid_strings[] = {
+  [STR_IDX_LANGID]  = (uint8_t *)&usbd_language_id_desc,
+  [STR_IDX_MFC]     = (uint8_t *)&manufacturer_string,
+  [STR_IDX_PRODUCT] = (uint8_t *)&product_string,
+  [STR_IDX_SERIAL]  = (uint8_t *)&serial_string
+};
 
 usb_desc desc = {
-  .dev_desc    = (uint8_t *)&dev_desc,
-  .config_desc = config_desc,
+  .dev_desc    = (uint8_t *)&devDesc,
+  .config_desc = (uint8_t *)&configDesc,
   .bos_desc    = nullptr,
   .strings     = usbd_hid_strings
 };
@@ -176,23 +117,23 @@ static uint8_t class_core_init(usb_dev* usbd, uint8_t config_index)
    * Endpoint 0 is configured during startup, so skip it and only
    * handle what’s configured by ‘PluggableUSB’.
    */
-  for (int i = 1; i < PluggableUSB().epCount(); i++) {
+  for (uint8_t ep = 1; ep < PluggableUSB().epCount(); ep++) {
     usb_desc_ep ep_desc = {
       .header = {
         .bLength = sizeof(ep_desc),
         .bDescriptorType = USB_DESCTYPE_EP,
       },
-      .bEndpointAddress = EPTYPE_ADDR(*(uint16_t *)epBuffer(i)),
-      .bmAttributes = EPTYPE_TYPE(*(uint16_t *)epBuffer(i)),
+      .bEndpointAddress = EPTYPE_DIR(*(uint16_t *)epBuffer(ep)) | ep,
+      .bmAttributes = EPTYPE_TYPE(*(uint16_t *)epBuffer(ep)),
       .wMaxPacketSize = USBD_EP0_MAX_SIZE,
       .bInterval = 0,
     };
     /*
      * Assume all endpoints have a max packet length of
-     * ‘USBD_EP0_MAX_SIZE’ and are uni-directional.
+     * ‘USBD_EP0_MAX_SIZE’.
      */
-    uint32_t buf_addr = EP0_RX_ADDR + (i * USBD_EP0_MAX_SIZE/2);
-    usbd->drv_handler->ep_setup(usbd, EP_BUF_SNG, buf_addr, &ep_desc);
+    uint32_t buf_offset = EP0_RX_ADDR + (ep * USBD_EP0_MAX_SIZE/2);
+    usbd->drv_handler->ep_setup(usbd, EP_BUF_SNG, buf_offset, &ep_desc);
   }
   return USBD_OK;
 }
@@ -257,9 +198,6 @@ void PacketBuf::push(uint8_t d) {
 
 USBCore_::USBCore_()
 {
-  for (int i = 0; i < EP_COUNT; i++) {
-    this->txAvailable[i] = true;
-  }
 }
 
 void USBCore_::init()
@@ -285,33 +223,21 @@ void USBCore_::init()
 // sent, or -1 on error.
 int USBCore_::sendControl(uint8_t flags, const void* d, int len)
 {
+  int l = min(len, this->maxWrite);
   int wrote = 0;
-
-  while (wrote < len) {
-    // TODO: this will break when using ‘USB_SendControl’ to calculate
-    // the config descriptor length, because ‘transc_in’ isn’t called
-    // in that circumstance.
-
-    // usb_transc_config(usbd->transc_in[0], p, len, 0);
-    for (; this->p < this->tail && len > 0; wrote++) {
-      *this->p++ = *(uint8_t *)d++;
+  while (wrote < l) {
+    size_t w = min(this->sendSpace(0), l - wrote);
+    memcpy(this->p, d, w);
+    this->p += w;
+    if (this->p == this->tail) {
+      flushcalled = true;
+      this->flush(0);
     }
-    this->flush(0);
+    wrote += w;
+    this->maxWrite -= w;
   }
 
-  // Send a ZLP only when we’re done with the data transmission and
-  // the final transmission is exactly the max packet size.
-  if (wrote % sizeof(this->buf) == 0) {
-    // TODO: check to see if we need ‘sendZLP’ here, or if
-    // ‘transc_in’ will be called even when a ZLP is sent.
-    //
-    // If ‘transc_in’ is called, then this is going to be the more
-    // correct behavior, because it waits for the transaction to
-    // complete before allowing further ones.
-    this->flush(0);
-  }
-
-  return wrote;
+  return len;
 }
 
 // Does not timeout or cross fifo boundaries. Returns the number of
@@ -364,16 +290,23 @@ int USBCore_::recv(uint8_t ep)
 // Flushes an outbound transmission as soon as possible.
 int USBCore_::flush(uint8_t ep)
 {
-  // TODO: this is broken: we’re flushing to an endpoint with ‘buf’
-  // and ‘p’, which is not per-endpoint.
-  while (!this->txAvailable[0]) {
-    // busy loop until the previous transaction was processed.
-    //wfi();
-  }
-
-  this->txAvailable[ep] = false;
-  usbd.drv_handler->ep_write(buf, ep, p-buf);
+  usbd.drv_handler->ep_write(this->buf, ep, this->p - this->buf);
+  //usbd_ep_send(&usbd, ep, this->buf, this->p - this->buf);
   this->p = this->buf;
+
+  // Busy loop until the IN transaction completes.
+  //volatile uint16_t int_status = (uint16_t)USBD_INTF;
+  //while (!(USBD_INTF & INTF_STIF) || (USBD_INTF & INTF_DIR)) {}
+  //while (!(USBD_EPxCS(ep) & EPxCS_TX_ST)) {}
+  while (true) {
+    volatile uint16_t int_status = (uint16_t)USBD_INTF;
+    uint8_t ep_num = int_status & INTF_EPNUM;
+    if ((int_status & INTF_STIF) == INTF_STIF
+        && (int_status & INTF_DIR) == 0
+        && ep_num == ep) {
+      break;
+    }
+  }
 }
 
 void USBCore_::_transc_setup(usb_dev* usbd, uint8_t ep)
@@ -415,13 +348,11 @@ void USBCore_::transc_setup(usb_dev* usbd, uint8_t ep) {
   switch (usbd->control.req.bmRequestType & USB_REQTYPE_MASK) {
     /* standard device request */
   case USB_REQTYPE_STRD:
-    // TODO: The problem!
-    // Maybe just work around usbd->control.req->bRequest == USB_GET_DESCRIPTOR, bRequestType == USB_DESCTYPE_{DEV,CONFIG,STR}
     if (usbd->control.req.bRequest == USB_GET_DESCRIPTOR
-        && (usbd->control.req.bRequest & USB_RECPTYPE_MASK) == USB_RECPTYPE_DEV
+        && (usbd->control.req.bmRequestType & USB_RECPTYPE_MASK) == USB_RECPTYPE_DEV
         && (usbd->control.req.wValue >> 8) == USB_DESCTYPE_CONFIG) {
       this->sendDeviceConfigDescriptor(usbd);
-      reqstat = REQ_SUPP;
+      return;
     } else {
       reqstat = usbd_standard_request(usbd, &usbd->control.req);
     }
@@ -467,9 +398,11 @@ void USBCore_::transc_out(usb_dev* usbd, uint8_t ep) {
 
 // Called in interrupt context.
 void USBCore_::transc_in(usb_dev* usbd, uint8_t ep) {
-  // Mark this endpoint’s transaction as complete.
-  this->txAvailable[ep] = true;
-
+  shouldbreak = configdesc && flushcalled;
+  if (shouldbreak) {
+    // use this as a breakpoint
+    shouldbreak = false;
+  }
   this->old_transc_in(usbd, ep);
 }
 
@@ -477,27 +410,25 @@ void USBCore_::transc_unknown(usb_dev* usbd, uint8_t ep) {
   this->old_transc_unknown(usbd, ep);
 }
 
-// TODO: make the device descriptor a member variable which can be
-// overridden by subclasses.
 void USBCore_::sendDeviceConfigDescriptor(usb_dev* usbd)
 {
-  uint8_t interfaces;
+  configdesc = true;
 
-  // TODO: need to call ‘getInterface’ twice, once to find out how
-  // many interfaces there even are.
-  const uint8_t configHeader[] = {
-    // bLength, bDescriptorType
-    9, 2,
+  this->maxWrite = 0;
+  uint8_t interfaceCount = 0;
+  uint16_t len = PluggableUSB().getInterface(&interfaceCount);
 
-    // wTotalLength, bNumInterfaces, bConfigurationValue, iConfiguration
-    25, 0, 1, 1, 0,
-
-    // bmAttributes, bMaxPower
-    0b10000000, 50,
-  };
-  this->sendControl(0, &configHeader, sizeof(configHeader));
-  PluggableUSB().getInterface(&interfaces);
+  configDesc.wTotalLength = sizeof(configDesc) + len;
+  configDesc.bNumInterfaces = interfaceCount;
+  this->maxWrite = usbd->control.req.wLength;
+  this->sendControl(0, &configDesc, sizeof(configDesc));
+  interfaceCount = 0;
+  PluggableUSB().getInterface(&interfaceCount);
+  // TODO: verify this sends ZLP properly when:
+  //   wTotalLength % sizeof(this->buf) == 0
   this->flush(0);
+
+  configdesc = false;
 }
 
 void USBCore_::sendZLP(usb_dev* usbd, uint8_t ep)
