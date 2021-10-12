@@ -205,17 +205,17 @@ void USBCore_::init()
   usb_init(&desc, &class_core);
   usbd.user_data = this;
 
-  this->old_transc_setup = usbd.ep_transc[0][TRANSC_SETUP];
-  usbd.ep_transc[0][TRANSC_SETUP] = USBCore_::_transc_setup;
+  this->oldTranscSetup = usbd.ep_transc[0][TRANSC_SETUP];
+  usbd.ep_transc[0][TRANSC_SETUP] = USBCore_::transcSetupHelper;
 
-  this->old_transc_out = usbd.ep_transc[0][TRANSC_OUT];
-  usbd.ep_transc[0][TRANSC_OUT] = USBCore_::_transc_out;
+  this->oldTranscOut = usbd.ep_transc[0][TRANSC_OUT];
+  usbd.ep_transc[0][TRANSC_OUT] = USBCore_::transcOutHelper;
 
-  this->old_transc_in = usbd.ep_transc[0][TRANSC_IN];
-  usbd.ep_transc[0][TRANSC_IN] = USBCore_::_transc_in;
+  this->oldTranscIn = usbd.ep_transc[0][TRANSC_IN];
+  usbd.ep_transc[0][TRANSC_IN] = USBCore_::transcInHelper;
 
-  this->old_transc_unknown = usbd.ep_transc[0][TRANSC_UNKNOWN];
-  usbd.ep_transc[0][TRANSC_UNKNOWN] = USBCore_::_transc_unknown;
+  this->oldTranscUnknown = usbd.ep_transc[0][TRANSC_UNKNOWN];
+  usbd.ep_transc[0][TRANSC_UNKNOWN] = USBCore_::transcUnknownHelper;
 }
 
 // Send ‘len’ octets of ‘d’ through the control pipe (endpoint 0).
@@ -291,50 +291,57 @@ int USBCore_::recv(uint8_t ep)
 int USBCore_::flush(uint8_t ep)
 {
   usbd.drv_handler->ep_write(this->buf, ep, this->p - this->buf);
-  //usbd_ep_send(&usbd, ep, this->buf, this->p - this->buf);
   this->p = this->buf;
 
-  // Busy loop until the IN transaction completes.
-  //volatile uint16_t int_status = (uint16_t)USBD_INTF;
-  //while (!(USBD_INTF & INTF_STIF) || (USBD_INTF & INTF_DIR)) {}
-  //while (!(USBD_EPxCS(ep) & EPxCS_TX_ST)) {}
+  /*
+   * Busy loop until the IN transaction completes.
+   *
+   * I’m not sure how much of this is necessary, but this is the
+   * series of checks that’s used by ‘usbd_isr’ to verify the IN
+   * packet has been sent.
+   *
+   * NB: We’re not clearing the interrupt flags so that the interrupt
+   * will fire when everything’s done, allowing ‘usbd_isr’ to call
+   * hooks or cleanup as necessary.
+   */
   while (true) {
     volatile uint16_t int_status = (uint16_t)USBD_INTF;
     uint8_t ep_num = int_status & INTF_EPNUM;
     if ((int_status & INTF_STIF) == INTF_STIF
         && (int_status & INTF_DIR) == 0
-        && ep_num == ep) {
+        && ep_num == ep
+        && USBD_EPxCS(ep_num) & EPxCS_TX_ST) {
       break;
     }
   }
 }
 
-void USBCore_::_transc_setup(usb_dev* usbd, uint8_t ep)
+void USBCore_::transcSetupHelper(usb_dev* usbd, uint8_t ep)
 {
-  USBCore_* core = (USBCore_ *)usbd->user_data;
-  core->transc_setup(usbd, ep);
+  USBCore_* core = (USBCore_*)usbd->user_data;
+  core->transcSetup(usbd, ep);
 }
 
-void USBCore_::_transc_out(usb_dev* usbd, uint8_t ep)
+void USBCore_::transcOutHelper(usb_dev* usbd, uint8_t ep)
 {
-  USBCore_* core = (USBCore_ *)usbd->user_data;
-  core->transc_out(usbd, ep);
+  USBCore_* core = (USBCore_*)usbd->user_data;
+  core->transcOut(usbd, ep);
 }
 
-void USBCore_::_transc_in(usb_dev* usbd, uint8_t ep)
+void USBCore_::transcInHelper(usb_dev* usbd, uint8_t ep)
 {
-  USBCore_* core = (USBCore_ *)usbd->user_data;
-  core->transc_in(usbd, ep);
+  USBCore_* core = (USBCore_*)usbd->user_data;
+  core->transcIn(usbd, ep);
 }
 
-void USBCore_::_transc_unknown(usb_dev* usbd, uint8_t ep)
+void USBCore_::transcUnknownHelper(usb_dev* usbd, uint8_t ep)
 {
-  USBCore_* core = (USBCore_ *)usbd->user_data;
-  core->transc_unknown(usbd, ep);
+  USBCore_* core = (USBCore_*)usbd->user_data;
+  core->transcUnknown(usbd, ep);
 }
 
 // Called in interrupt context.
-void USBCore_::transc_setup(usb_dev* usbd, uint8_t ep) {
+void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep) {
   usb_reqsta reqstat = REQ_NOTSUPP;
 
   uint16_t count = usbd->drv_handler->ep_read((uint8_t *)(&usbd->control.req), 0, (uint8_t)EP_BUF_SNG);
@@ -392,22 +399,22 @@ void USBCore_::transc_setup(usb_dev* usbd, uint8_t ep) {
 }
 
 // Called in interrupt context.
-void USBCore_::transc_out(usb_dev* usbd, uint8_t ep) {
-  this->old_transc_out(usbd, ep);
+void USBCore_::transcOut(usb_dev* usbd, uint8_t ep) {
+  this->oldTranscOut(usbd, ep);
 }
 
 // Called in interrupt context.
-void USBCore_::transc_in(usb_dev* usbd, uint8_t ep) {
+void USBCore_::transcIn(usb_dev* usbd, uint8_t ep) {
   shouldbreak = configdesc && flushcalled;
   if (shouldbreak) {
     // use this as a breakpoint
     shouldbreak = false;
   }
-  this->old_transc_in(usbd, ep);
+  this->oldTranscIn(usbd, ep);
 }
 
-void USBCore_::transc_unknown(usb_dev* usbd, uint8_t ep) {
-  this->old_transc_unknown(usbd, ep);
+void USBCore_::transcUnknown(usb_dev* usbd, uint8_t ep) {
+  this->oldTranscUnknown(usbd, ep);
 }
 
 void USBCore_::sendDeviceConfigDescriptor(usb_dev* usbd)
