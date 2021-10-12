@@ -79,10 +79,10 @@ private:
   /*
    * Pointers to the transaction routines specified by ‘usbd_init’.
    */
-  void (*old_transc_setup)(usb_dev* usbd, uint8_t ep);
-  void (*old_transc_out)(usb_dev* usbd, uint8_t ep);
-  void (*old_transc_in)(usb_dev* usbd, uint8_t ep);
-  void (*old_transc_unknown)(usb_dev* usbd, uint8_t ep);
+  void (*oldTranscSetup)(usb_dev* usbd, uint8_t ep);
+  void (*oldTranscOut)(usb_dev* usbd, uint8_t ep);
+  void (*oldTranscIn)(usb_dev* usbd, uint8_t ep);
+  void (*oldTranscUnknown)(usb_dev* usbd, uint8_t ep);
 
   /*
    * Static member function helpers called from ISR.
@@ -90,15 +90,15 @@ private:
    * These pull the core handle from ‘usbd’ and use it to call the
    * instance member functions.
    */
-  static void _transc_setup(usb_dev* usbd, uint8_t ep);
-  static void _transc_out(usb_dev* usbd, uint8_t ep);
-  static void _transc_in(usb_dev* usbd, uint8_t ep);
-  static void _transc_unknown(usb_dev* usbd, uint8_t ep);
+  static void transcSetupHelper(usb_dev* usbd, uint8_t ep);
+  static void transcOutHelper(usb_dev* usbd, uint8_t ep);
+  static void transcInHelper(usb_dev* usbd, uint8_t ep);
+  static void transcUnknownHelper(usb_dev* usbd, uint8_t ep);
 
-  void transc_setup(usb_dev* usbd, uint8_t ep);
-  void transc_out(usb_dev* usbd, uint8_t ep);
-  void transc_in(usb_dev* usbd, uint8_t ep);
-  void transc_unknown(usb_dev* usbd, uint8_t ep);
+  void transcSetup(usb_dev* usbd, uint8_t ep);
+  void transcOut(usb_dev* usbd, uint8_t ep);
+  void transcIn(usb_dev* usbd, uint8_t ep);
+  void transcUnknown(usb_dev* usbd, uint8_t ep);
 
   void sendDeviceConfigDescriptor(usb_dev* usbd);
 
