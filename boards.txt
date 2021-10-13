@@ -45,3 +45,4 @@ keyboardio_model_100.menu.upload_method.stlinkMethod.upload.protocol=stlink
 keyboardio_model_100.menu.upload_method.stlinkMethod.upload.options=
 keyboardio_model_100.menu.upload_method.stlinkMethod.build.upload_flags=-DCONFIG_MAPLE_MINI_NO_DISABLE_DEBUG=1 -DSERIAL_USB -DGENERIC_BOOTLOADER
 keyboardio_model_100.menu.upload_method.stlinkMethod.upload.tool=stlink_upload
+keyboardio_model_100.upload.tool.default=stlink_upload
