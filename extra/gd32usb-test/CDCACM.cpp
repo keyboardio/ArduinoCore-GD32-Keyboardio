@@ -17,7 +17,7 @@ CDCACM cdcacm;
 #define SEND_BREAK                0x23
 #define NO_CMD                    0xFF
 
-CDCACM::CDCACM() : arduino::PluggableUSBModule(2, 3, epType) {
+CDCACM::CDCACM() : arduino::PluggableUSBModule(3, 2, epType) {
   this->epType[0] = EPTYPE(USB_TRX_IN, USB_EP_ATTR_INT);
   this->epType[1] = EPTYPE(USB_TRX_OUT, USB_EP_ATTR_BULK);
   this->epType[2] = EPTYPE(USB_TRX_IN, USB_EP_ATTR_BULK);
