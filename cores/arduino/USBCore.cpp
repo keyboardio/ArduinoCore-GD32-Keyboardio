@@ -229,12 +229,13 @@ int USBCore_::sendControl(uint8_t flags, const void* d, int len)
     size_t w = min(this->sendSpace(0), l - wrote);
     memcpy(this->p, d, w);
     this->p += w;
+    d += w;
+    wrote += w;
+    this->maxWrite -= w;
     if (this->p == this->tail) {
       flushcalled = true;
       this->flush(0);
     }
-    wrote += w;
-    this->maxWrite -= w;
   }
 
   return len;
@@ -304,7 +305,8 @@ int USBCore_::flush(uint8_t ep)
    * will fire when everything’s done, allowing ‘usbd_isr’ to call
    * hooks or cleanup as necessary.
    */
-  while (true) {
+  bool debugTODO = true;
+  while (debugTODO) {
     volatile uint16_t int_status = (uint16_t)USBD_INTF;
     uint8_t ep_num = int_status & INTF_EPNUM;
     if ((int_status & INTF_STIF) == INTF_STIF
