@@ -45,7 +45,7 @@
 //#define __SYSTEM_CLOCK_48M_PLL_IRC8M            (uint32_t)(48000000)
 //#define __SYSTEM_CLOCK_72M_PLL_IRC8M            (uint32_t)(72000000)
 //#define __SYSTEM_CLOCK_108M_PLL_IRC8M           (uint32_t)(108000000)
-//#define __SYSTEM_CLOCK_120M_PLL_IRC8M           (uint32_t)(120000000)
+#define __SYSTEM_CLOCK_120M_PLL_IRC8M           (uint32_t)(120000000)
 
 /* use HXTAL(XD series CK_HXTAL = 8M, CL series CK_HXTAL = 25M) */
 //#define __SYSTEM_CLOCK_HXTAL                    (uint32_t)(__HXTAL)
