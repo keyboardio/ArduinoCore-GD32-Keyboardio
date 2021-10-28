@@ -26,37 +26,26 @@ extern "C" {
 #define USB_Recv USBCore().recv
 #define USB_Flush USBCore().flush
 
-class PacketBuf {
+template<size_t L>
+class EPBuffer {
 public:
-  void init(uint8_t ep) { this->ep = ep; };
-  void push(uint8_t d);
-  uint8_t* data() { return buf; };
-  int length() { return this->p - this->buf; };
-  int remaining() { return sizeof(this->buf) - this->length(); };
+  size_t push(const void* d, size_t len);
+  uint8_t* ptr();
+  void reset();
+  size_t len();
+  size_t remaining();
 
 private:
-  uint8_t ep;
-  uint8_t buf[USBD_EP0_MAX_SIZE];
+  uint8_t buf[L];
   uint8_t* tail = buf + sizeof(buf);
   uint8_t* p = buf;
-};
-
-class NoOpPacketBuf: PacketBuf {
-public:
-  void push(uint8_t d) { len++; };
-  uint8_t* data() { return NULL; };
-  int length() { return this->len; };
-  int remaining() { return 0; };
-
-private:
-  int len = 0;
 };
 
 class USBCore_ {
 public:
   USBCore_();
 
-  void init();
+  void connect();
 
   int sendControl(uint8_t flags, const void* d, int len);
   int recvControl(void* d, int len);
@@ -69,9 +58,7 @@ public:
   int flush(uint8_t ep);
 
 private:
-  uint8_t buf[USBD_EP0_MAX_SIZE];
-  uint8_t* tail = buf + sizeof(buf);
-  uint8_t* p = buf;
+  EPBuffer<USBD_EP0_MAX_SIZE> epBufs[EP_COUNT];
   // TODO: verify that this only applies to the control endpoint’s use of wLength
   // I think this is only on the setup packet, so it should be fine.
   uint16_t maxWrite = 0;
@@ -101,6 +88,10 @@ private:
   void transcUnknown(usb_dev* usbd, uint8_t ep);
 
   void sendDeviceConfigDescriptor(usb_dev* usbd);
+  void waitForDataReady(uint8_t ep);
+  void clearDataReady(uint8_t ep);
+  void waitForWriteComplete(uint8_t ep);
+  void clearWriteComplete(uint8_t ep);
 
   void sendZLP(usb_dev* usbd, uint8_t ep);
 };
