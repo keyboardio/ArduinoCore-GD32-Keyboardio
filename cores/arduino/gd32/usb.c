@@ -51,41 +51,44 @@ void usb_init(usb_desc* desc, usb_class* class_core)
 	rcu_config();
 	gpio_config();
 
-	// For PluggableUSB, ‘hid_desc’ needs to be replaced with the
-	// configuration from PluggableUSB. ‘hid_class’ is a series of
-	// callbacks.
-
-	// cf file:~/Arduino/hardware/dev/ArduinoCore-GD32/system/GD32F30x_firmware/GD32F30x_usbd_library/class/device/hid/Source/standard_hid_core.c::usb_class hid_class = {
 	usbd_init(&usbd, desc, class_core);
-
-	/*
-	 * PluggableUSB uses USB_SendControl to add descriptors to an
-	 * in-progress buffer, which will only get sent when all
-	 * interfaces are accounted for.
-	 */
-
-	/*
-	 * Keep a wMaxPacketSize buffer for each endpoint and flush it
-	 * when its full.
-	 *
-	 * ISR will need to call into custom routines which check
-	 * PluggableUSB for configuration data. Doesn’t look like
-	 * usbd_init is going to work as is.
-	 *
-	 * Instead, maybe call it with NULLs as the last two
-	 * arguments, then, since usbd_isr() doesn’t use those
-	 * structures directly, we can modify the
-	 * transc_out/transc_in,ep_transc tables?
-	 *
-	 * May be more trouble than it’s worth, and just write our own
-	 * isr, taking on the risks that entails.
-	 */
 }
 
-void usb_connect() {
+void usb_connect()
+{
 	nvic_config();
 	usbd_connect(&usbd);
 	while (usbd.cur_status != USBD_CONFIGURED) {}
+}
+
+static usbd_ep_ram* usb_ep_ram(uint8_t ep)
+{
+	usbd_ep_ram *btable_ep = (usbd_ep_ram*)(USBD_RAM + 2 * (BTABLE_OFFSET & 0xFFF8));
+	return &btable_ep[ep];
+}
+
+uint8_t* usb_ep_rx_addr(uint8_t ep)
+{
+	usbd_ep_ram* ep_ram = usb_ep_ram(ep);
+	return (uint8_t*)(ep_ram->rx_addr * 2U + USBD_RAM);
+}
+
+uint32_t* usb_ep_rx_count(uint8_t ep)
+{
+	usbd_ep_ram* ep_ram = usb_ep_ram(ep);
+	return &ep_ram->rx_count;
+}
+
+uint8_t* usb_ep_tx_addr(uint8_t ep)
+{
+	usbd_ep_ram* ep_ram = usb_ep_ram(ep);
+	return (uint8_t*)(ep_ram->tx_addr * 2U + USBD_RAM);
+}
+
+uint32_t* usb_ep_tx_count(uint8_t ep)
+{
+	usbd_ep_ram* ep_ram = usb_ep_ram(ep);
+	return &ep_ram->tx_count;
 }
 
 void USBD_HP_CAN0_TX_IRQHandler()
