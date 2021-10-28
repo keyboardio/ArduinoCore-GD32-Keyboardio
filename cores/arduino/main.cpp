@@ -48,9 +48,9 @@ __attribute__((constructor(101))) void premain()
 
 int main(void)
 {
-    // Init USB here, if available, for CDC-ACM serial.
-    USBCore().init();
-    usb_connect();
+    // TODO: remove this and only call it when the USB is attempted to
+    // be used.
+    USBCore().connect();
 
     setup();
 
