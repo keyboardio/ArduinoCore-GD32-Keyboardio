@@ -308,16 +308,16 @@ int USBCore_::send(uint8_t ep, const void* d, int len)
     // TODO: query the endpoint for its max packet length.
     auto l = min(USBD_EP0_MAX_SIZE, len-wrote);
     usbd.drv_handler->ep_write((uint8_t*)d+wrote, ep, l);
-    this->waitForWriteComplete(0);
-    this->clearWriteComplete(0);
+    this->waitForWriteComplete(ep);
+    this->clearWriteComplete(ep);
     wrote += l;
   }
 
   // Send ZLP if necessary.
   if ((len % USBD_EP0_MAX_SIZE) == 0) {
     usbd.drv_handler->ep_write(nullptr, ep, 0);
-    this->waitForWriteComplete(0);
-    this->clearWriteComplete(0);
+    this->waitForWriteComplete(ep);
+    this->clearWriteComplete(ep);
   }
 
   return wrote;
