@@ -1,0 +1,7 @@
+((nil . ((compilation-read-command . nil)
+         (projectile-run-use-comint-mode . t)
+         (projectile-project-compilation-dir . "extra/gd32usb-test")
+         (projectile-project-compilation-cmd . "make")
+         (projectile-project-run-cmd . "make gdb")))
+ (c-mode . ((c-file-style . "linux")
+            (indent-tabs-mode . t))))
