@@ -1,3 +1,6 @@
 [submodule "libraries/Kaleidoscope"]
 	path = libraries/Kaleidoscope
 	url = https://github.com/keyboardio/Kaleidoscope
+[submodule "libraries/KeyboardioHID"]
+	path = libraries/KeyboardioHID
+	url = https://github.com/keyboardio/KeyboardioHID
