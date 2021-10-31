@@ -10,35 +10,46 @@ extern "C" {
  * Macros for encoding the endpoint into a 16-bit integer containing
  * the endpoint’s direction, and type.
  */
-#define EPTYPE(dir, type) ((dir << 8) | type)
-#define EPTYPE_DIR(eptype) (eptype >> 8)
+#define EPTYPE(dir, type)   ((dir << 8) | type)
+#define EPTYPE_DIR(eptype)  (eptype >> 8)
 #define EPTYPE_TYPE(eptype) (eptype & 0xff)
 
 /*
  * Mappings from Arduino USB API to USBCore singleton functions.
  */
-#define USB_SendControl USBCore().sendControl
-#define USB_RecvControl USBCore().recvControl
+#define TRANSFER_PGM     0x00
+#define TRANSFER_ZERO    0x20
+#define TRANSFER_RELEASE 0x40
+
+#define USB_SendControl     USBCore().sendControl
+#define USB_RecvControl     USBCore().recvControl
 #define USB_RecvControlLong USBCore().recvControlLong
-#define USB_Available USBCore().available
-#define USB_SendSpace USBCore().sendSpace
-#define USB_Send USBCore().send
-#define USB_Recv USBCore().recv
-#define USB_Flush USBCore().flush
+#define USB_Available       USBCore().available
+#define USB_SendSpace       USBCore().sendSpace
+#define USB_Send            USBCore().send
+#define USB_Recv            USBCore().recv
+#define USB_Flush           USBCore().flush
 
 template<size_t L>
 class EPBuffer {
 public:
   size_t push(const void* d, size_t len);
-  uint8_t* ptr();
   void reset();
   size_t len();
   size_t remaining();
+  void flush(uint8_t ep);
+  void markComplete();
 
 private:
+  void waitForDataReady(uint8_t ep);
+  void waitForWriteComplete(uint8_t ep);
+
   uint8_t buf[L];
   uint8_t* tail = buf + sizeof(buf);
   uint8_t* p = buf;
+
+  // TODO: this should probably be explicitly atomic.
+  volatile bool txWaiting = false;
 };
 
 class USBCore_ {
@@ -88,10 +99,6 @@ private:
   void transcUnknown(usb_dev* usbd, uint8_t ep);
 
   void sendDeviceConfigDescriptor(usb_dev* usbd);
-  void waitForDataReady(uint8_t ep);
-  void clearDataReady(uint8_t ep);
-  void waitForWriteComplete(uint8_t ep);
-  void clearWriteComplete(uint8_t ep);
 
   void sendZLP(usb_dev* usbd, uint8_t ep);
 };
