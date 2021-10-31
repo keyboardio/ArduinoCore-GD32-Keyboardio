@@ -8,13 +8,6 @@ extern "C" {
 #include "usbd_lld_regs.h"
 }
 
-/*
- * TODO: remove these debugging watchpoints.
- */
-bool configdesc = false;
-bool flushcalled = false;
-bool shouldbreak = false;
-
 #define USBD_VID 0xdead
 #define USBD_PID 0xbeef
 
@@ -213,11 +206,6 @@ size_t EPBuffer<L>::push(const void *d, size_t len) {
 }
 
 template<size_t L>
-uint8_t* EPBuffer<L>::ptr() {
-  return this->buf;
-}
-
-template<size_t L>
 void EPBuffer<L>::reset() {
   this->p = this->buf;
 }
@@ -230,6 +218,72 @@ size_t EPBuffer<L>::len() {
 template<size_t L>
 size_t EPBuffer<L>::remaining() {
   return this->tail - this->p;
+}
+
+template<size_t L>
+void EPBuffer<L>::flush(uint8_t ep) {
+  //  Serial.println("flush");
+  this->txWaiting = true;
+  usbd.drv_handler->ep_write(this->buf, ep, this->len());
+
+  /*
+   * Busy loop until the IN transaction completes.
+   */
+  this->waitForWriteComplete(ep);
+}
+
+template<size_t L>
+void EPBuffer<L>::markComplete() {
+  //  Serial.println("comp");
+  this->txWaiting = false;
+}
+
+// Busy loop until an OUT packet is received on endpoint ‘ep’.
+//
+// Does not modify register flags. Once this function returns, it will
+// continue to return without waiting until ‘clearDataReady’ is
+// called.
+template<size_t L>
+void EPBuffer<L>::waitForDataReady(uint8_t ep)
+{
+  while (this->txWaiting) {
+    volatile uint16_t int_status = (uint16_t)USBD_INTF;
+    uint8_t ep_num = int_status & INTF_EPNUM;
+    if ((int_status & INTF_STIF) == INTF_STIF
+        && (int_status & INTF_DIR) == INTF_DIR
+        && ep_num == ep
+        && USBD_EPxCS(ep_num) & EPxCS_RX_ST) {
+      USBD_EP_RX_ST_CLEAR(ep);
+      this->markComplete();
+    }
+  }
+}
+
+// Busy loop until the latest IN packet has been sent from endpoint
+// ‘ep’.
+//
+// Does not modify register flags. Once this function returns, it will
+// continue to return without waiting until ‘clearWriteComplete’ is
+// called.
+template<size_t L>
+void EPBuffer<L>::waitForWriteComplete(uint8_t ep)
+{
+  /*
+   * I’m not sure how much of this is necessary, but this is the
+   * series of checks that’s used by ‘usbd_isr’ to verify the IN
+   * packet has been sent.
+   */
+  while (this->txWaiting) {
+    volatile uint16_t int_status = (uint16_t)USBD_INTF;
+    uint8_t ep_num = int_status & INTF_EPNUM;
+    if ((int_status & INTF_STIF) == INTF_STIF
+        && (int_status & INTF_DIR) == 0
+        && ep_num == ep
+        && USBD_EPxCS(ep_num) & EPxCS_TX_ST) {
+      USBD_EP_TX_ST_CLEAR(ep);
+      this->markComplete();
+    }
+  }
 }
 
 USBCore_::USBCore_()
@@ -252,6 +306,8 @@ USBCore_::USBCore_()
 
 void USBCore_::connect()
 {
+  //  Serial.begin(115200);
+  //  Serial.println("connect");
   usb_connect();
 }
 
@@ -260,15 +316,14 @@ void USBCore_::connect()
 // sent, or -1 on error.
 int USBCore_::sendControl(uint8_t flags, const void* d, int len)
 {
-  int l = min(len, this->maxWrite);
-  int wrote = 0;
+  auto l = min(len, this->maxWrite);
+  auto wrote = 0;
   while (wrote < l) {
     size_t w = this->epBufs[0].push(d, l - wrote);
     d += w;
     wrote += w;
     this->maxWrite -= w;
     if (this->sendSpace(0) == 0) {
-      flushcalled = true;
       this->flush(0);
     }
   }
@@ -283,8 +338,9 @@ int USBCore_::recvControl(void* d, int len)
   auto read = 0;
   while (read < len) {
     usbd.drv_handler->ep_rx_enable(&usbd, 0);
-    this->waitForDataReady(0);
-    this->clearDataReady(0);
+    // TODO: use epBufs
+    //this->waitForDataReady(0);
+    //this->clearDataReady(0);
     read += usbd.drv_handler->ep_read((uint8_t*)d+read, 0, EP_BUF_SNG);
 
     // TODO: break if ‘read’ is less than endpoint’s max packet
@@ -318,23 +374,30 @@ uint8_t USBCore_::sendSpace(uint8_t ep)
 int USBCore_::send(uint8_t ep, const void* d, int len)
 {
   // Top nybble is used for flags.
+  auto flags = ep & 0xf0;
   ep &= 0x7;
   auto wrote = 0;
 
+  // TODO: query the endpoint for its max packet length.
   while (wrote < len) {
-    // TODO: query the endpoint for its max packet length.
-    auto l = min(USBD_EP0_MAX_SIZE, len-wrote);
-    usbd.drv_handler->ep_write((uint8_t*)d+wrote, ep, l);
-    //this->waitForWriteComplete(ep);
-    //this->clearWriteComplete(ep);
-    wrote += l;
+    auto w = 0;
+    auto toWrite = len - wrote;
+    if (flags & TRANSFER_ZERO) {
+      // TODO: handle writing zeros instead of ‘d’.
+      return -1;
+    } else {
+      w = this->epBufs[ep].push(d, toWrite);
+    }
+    d += w;
+    wrote += w;
+
+    if (this->sendSpace(ep) == 0) {
+      this->flush(ep);
+    }
   }
 
-  // Send ZLP if necessary.
-  if ((len % USBD_EP0_MAX_SIZE) == 0) {
-    usbd.drv_handler->ep_write(nullptr, ep, 0);
-    //this->waitForWriteComplete(ep);
-    //this->clearWriteComplete(ep);
+  if (flags & TRANSFER_RELEASE) {
+    this->flush(ep);
   }
 
   return wrote;
@@ -357,84 +420,7 @@ int USBCore_::recv(uint8_t ep)
 // Flushes an outbound transmission as soon as possible.
 int USBCore_::flush(uint8_t ep)
 {
-  // TODO: just set this flag here, rather than calling
-  // ‘ep_write’. Instead, ditch the intermediate buffer in
-  // ‘epBufs[ep]’ and write directly to the SRAM region for the
-  // endpoint, same as ‘ep_write’ does.
-  //
-  // That way we can use flush in both ‘sendControl’ and ‘send’ to try
-  // and normalize control flow. As things stand now, using ‘flush’ on
-  // endpoints other than 0 will not work correctly. However, there’s
-  // also no reason to use this method on endpoints other than 0,
-  // since writing via ‘send’ does a complete write anyway.
-  //
-  //USBD_EP_TX_STAT_SET(ep, EPTX_VALID);
-
-  usbd.drv_handler->ep_write(this->epBufs[ep].ptr(), ep, this->epBufs[ep].len());
-  this->epBufs[ep].reset();
-
-  /*
-   * Busy loop until the IN transaction completes.
-   */
-  this->waitForWriteComplete(ep);
-}
-
-// Busy loop until an OUT packet is received on endpoint ‘ep’.
-//
-// Does not modify register flags. Once this function returns, it will
-// continue to return without waiting until ‘clearDataReady’ is
-// called.
-void USBCore_::waitForDataReady(uint8_t ep)
-{
-  bool debugTODO = true;
-  while (debugTODO) {
-    volatile uint16_t int_status = (uint16_t)USBD_INTF;
-    uint8_t ep_num = int_status & INTF_EPNUM;
-    if ((int_status & INTF_STIF) == INTF_STIF
-        && (int_status & INTF_DIR) == INTF_DIR
-        && ep_num == ep
-        && USBD_EPxCS(ep_num) & EPxCS_RX_ST) {
-      break;
-    }
-  }
-}
-
-// Reset data ready status for endpoint ‘ep’.
-void USBCore_::clearDataReady(uint8_t ep)
-{
-  USBD_EP_RX_ST_CLEAR(ep);
-}
-
-// Busy loop until the latest IN packet has been sent from endpoint
-// ‘ep’.
-//
-// Does not modify register flags. Once this function returns, it will
-// continue to return without waiting until ‘clearWriteComplete’ is
-// called.
-void USBCore_::waitForWriteComplete(uint8_t ep)
-{
-  /*
-   * I’m not sure how much of this is necessary, but this is the
-   * series of checks that’s used by ‘usbd_isr’ to verify the IN
-   * packet has been sent.
-   */
-  bool debugTODO = true;
-  while (debugTODO) {
-    volatile uint16_t int_status = (uint16_t)USBD_INTF;
-    uint8_t ep_num = int_status & INTF_EPNUM;
-    if ((int_status & INTF_STIF) == INTF_STIF
-        && (int_status & INTF_DIR) == 0
-        && ep_num == ep
-        && USBD_EPxCS(ep_num) & EPxCS_TX_ST) {
-      break;
-    }
-  }
-}
-
-// Reset write complete status for endpoint ‘ep’.
-void USBCore_::clearWriteComplete(uint8_t ep)
-{
-  USBD_EP_TX_ST_CLEAR(ep);
+  this->epBufs[ep].flush(ep);
 }
 
 void USBCore_::transcSetupHelper(usb_dev* usbd, uint8_t ep)
@@ -463,6 +449,7 @@ void USBCore_::transcUnknownHelper(usb_dev* usbd, uint8_t ep)
 
 // Called in interrupt context.
 void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep) {
+  //  Serial.print("S");
   usb_reqsta reqstat = REQ_NOTSUPP;
 
   uint16_t count = usbd->drv_handler->ep_read((uint8_t *)(&usbd->control.req), 0, (uint8_t)EP_BUF_SNG);
@@ -473,6 +460,7 @@ void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep) {
     return;
   }
 
+  //  Serial.print(".");
   this->maxWrite = usbd->control.req.wLength;
   switch (usbd->control.req.bmRequestType & USB_REQTYPE_MASK) {
     /* standard device request */
@@ -480,9 +468,11 @@ void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep) {
     if (usbd->control.req.bRequest == USB_GET_DESCRIPTOR
         && (usbd->control.req.bmRequestType & USB_RECPTYPE_MASK) == USB_RECPTYPE_DEV
         && (usbd->control.req.wValue >> 8) == USB_DESCTYPE_CONFIG) {
+      //      Serial.println("confdesc");
       this->sendDeviceConfigDescriptor(usbd);
       return;
     } else {
+      //      Serial.println("stddesc");
       reqstat = usbd_standard_request(usbd, &usbd->control.req);
     }
     break;
@@ -490,12 +480,14 @@ void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep) {
     /* device class request */
   case USB_REQTYPE_CLASS:
     // Calls into class_core->req_process, does nothing else.
+    //    Serial.println("classdesc");
     reqstat = usbd_class_request(usbd, &usbd->control.req);
     break;
 
     /* vendor defined request */
   case USB_REQTYPE_VENDOR:
     // Does nothing.
+    //    Serial.println("vendordesc");
     reqstat = usbd_vendor_request(usbd, &usbd->control.req);
     break;
 
@@ -522,16 +514,13 @@ void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep) {
 
 // Called in interrupt context.
 void USBCore_::transcOut(usb_dev* usbd, uint8_t ep) {
+  this->epBufs[ep].markComplete();
   this->oldTranscOut(usbd, ep);
 }
 
 // Called in interrupt context.
 void USBCore_::transcIn(usb_dev* usbd, uint8_t ep) {
-  shouldbreak = configdesc && flushcalled;
-  if (shouldbreak) {
-    // use this as a breakpoint
-    shouldbreak = false;
-  }
+  this->epBufs[ep].markComplete();
   this->oldTranscIn(usbd, ep);
 }
 
@@ -541,8 +530,6 @@ void USBCore_::transcUnknown(usb_dev* usbd, uint8_t ep) {
 
 void USBCore_::sendDeviceConfigDescriptor(usb_dev* usbd)
 {
-  configdesc = true;
-
   auto oldMaxWrite = this->maxWrite;
   this->maxWrite = 0;
   uint8_t interfaceCount = 0;
@@ -557,8 +544,6 @@ void USBCore_::sendDeviceConfigDescriptor(usb_dev* usbd)
   // TODO: verify this sends ZLP properly when:
   //   wTotalLength % sizeof(this->buf) == 0
   this->flush(0);
-
-  configdesc = false;
 }
 
 void USBCore_::sendZLP(usb_dev* usbd, uint8_t ep)
