@@ -145,12 +145,27 @@ static uint8_t class_core_deinit(usb_dev* usbd, uint8_t config_index)
   return USBD_OK;
 }
 
-// Called when ep0 gets a SETUP packet.
+// Called when ep0 gets a SETUP packet after configuration.
 static uint8_t class_core_req_process(usb_dev* usbd, usb_req* req)
 {
+  bool data_sent = false;
   arduino::USBSetup setup;
   memcpy(&setup, req, sizeof(setup));
-  PluggableUSB().setup(setup);
+  if (setup.bRequest == USB_GET_DESCRIPTOR) {
+    auto sent = PluggableUSB().getDescriptor(setup);
+    if (sent > 0) {
+      data_sent = true;
+    } else if (sent < 0) {
+      return REQ_NOTSUPP;
+    }
+  } else {
+    if (PluggableUSB().setup(setup)) {
+      data_sent = true;
+    }
+  }
+  if (data_sent) {
+    USB_Flush(0);
+  }
   return REQ_SUPP;
 }
 
@@ -302,22 +317,24 @@ uint8_t USBCore_::sendSpace(uint8_t ep)
 // sent, or -1 on error.
 int USBCore_::send(uint8_t ep, const void* d, int len)
 {
+  // Top nybble is used for flags.
+  ep &= 0x7;
   auto wrote = 0;
 
   while (wrote < len) {
     // TODO: query the endpoint for its max packet length.
     auto l = min(USBD_EP0_MAX_SIZE, len-wrote);
     usbd.drv_handler->ep_write((uint8_t*)d+wrote, ep, l);
-    this->waitForWriteComplete(ep);
-    this->clearWriteComplete(ep);
+    //this->waitForWriteComplete(ep);
+    //this->clearWriteComplete(ep);
     wrote += l;
   }
 
   // Send ZLP if necessary.
   if ((len % USBD_EP0_MAX_SIZE) == 0) {
     usbd.drv_handler->ep_write(nullptr, ep, 0);
-    this->waitForWriteComplete(ep);
-    this->clearWriteComplete(ep);
+    //this->waitForWriteComplete(ep);
+    //this->clearWriteComplete(ep);
   }
 
   return wrote;
@@ -456,6 +473,7 @@ void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep) {
     return;
   }
 
+  this->maxWrite = usbd->control.req.wLength;
   switch (usbd->control.req.bmRequestType & USB_REQTYPE_MASK) {
     /* standard device request */
   case USB_REQTYPE_STRD:
@@ -525,13 +543,14 @@ void USBCore_::sendDeviceConfigDescriptor(usb_dev* usbd)
 {
   configdesc = true;
 
+  auto oldMaxWrite = this->maxWrite;
   this->maxWrite = 0;
   uint8_t interfaceCount = 0;
   uint16_t len = PluggableUSB().getInterface(&interfaceCount);
 
   configDesc.wTotalLength = sizeof(configDesc) + len;
   configDesc.bNumInterfaces = interfaceCount;
-  this->maxWrite = usbd->control.req.wLength;
+  this->maxWrite = oldMaxWrite;
   this->sendControl(0, &configDesc, sizeof(configDesc));
   interfaceCount = 0;
   PluggableUSB().getInterface(&interfaceCount);
