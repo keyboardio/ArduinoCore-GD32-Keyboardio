@@ -1,4 +1,4 @@
-#include "TestPlug.h"
+#include "KeyboardioHID.h"
 
 void setup()
 {
@@ -7,7 +7,7 @@ void setup()
 
 				pinMode(LED2, OUTPUT);
 
-				Serial.println(tp.foo());
+				BootKeyboard.begin();
 }
 
 void loop()
@@ -15,6 +15,11 @@ void loop()
 				Serial.println("On");
 				digitalWrite(LED2, HIGH);
 				delay(500);
+
+				BootKeyboard.press(HID_KEYBOARD_A_AND_A);
+				BootKeyboard.sendReport();
+				BootKeyboard.releaseAll();
+				BootKeyboard.sendReport();
 
 				Serial.println("Off");
 				digitalWrite(LED2, LOW);

@@ -1,4 +1,4 @@
-FQBN = dev:ArduinoCore-GD32:gd_generic_f30x
+FQBN = dev:gd32:gd_generic_f30x
 GCC_PREFIX = /usr
 # TODO: arduino-cli --upload still doesn’t find openocd for some
 # reason. Maybe the method above is wrong?
@@ -37,8 +37,8 @@ gdb: build
 
 serial:
 #	$(SU) stty -F $(SERIAL) min 100 time 2 hupcl -brkint -ignpar icrnl opost onlcr isig icanon echo 115200
+#	$(SU) cat $(SERIAL)
 	$(SU) screen $(SERIAL) 115200
-	$(SU) cat $(SERIAL)
 
 etags:
 	find . -name '*.[ch]' -o -name '*.cpp' -o -name '*.ino' -print | etags -
