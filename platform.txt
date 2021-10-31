@@ -67,6 +67,8 @@ build.flags.fp=
 build.flags.optimize=-O0
 build.flags.ldspecs=--specs=nano.specs
 
+build.usb_flags=-DUSB_VID={build.vid} -DUSB_PID={build.pid} "-DUSB_MANUFACTURER={build.usb_manufacturer}" "-DUSB_PRODUCT={build.usb_product}"
+
 # compile patterns
 ## Compile c files
 recipe.c.o.pattern="{compiler.path}{compiler.c.cmd}" {compiler.c.flags} {build.info.flags} {compiler.c.extra_flags} {build.extra_flags} {includes} "{source_file}" -o "{object_file}"
