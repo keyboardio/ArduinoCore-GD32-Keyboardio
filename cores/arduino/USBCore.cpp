@@ -9,6 +9,8 @@ extern "C" {
 #include "usbd_transc.h"
 }
 
+#include <cassert>
+
 #define USBD_VID 0xdead
 #define USBD_PID 0xbeef
 
@@ -132,9 +134,9 @@ static uint8_t class_core_init(usb_dev* usbd, uint8_t config_index)
     assert(buf_offset <= (0x5fff - USBD_EP0_MAX_SIZE/2));
 #else
     buf_offset += USBD_EP0_MAX_SIZE;
+    assert(buf_offset <= (0x5fff - USBD_EP0_MAX_SIZE));
 #endif
     usbd->drv_handler->ep_setup(usbd, EP_BUF_SNG, buf_offset, &ep_desc);
-    assert(buf_offset <= (0x5fff - USBD_EP0_MAX_SIZE));
   }
   return USBD_OK;
 }
