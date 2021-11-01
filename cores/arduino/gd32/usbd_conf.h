@@ -87,7 +87,12 @@ OF SUCH DAMAGE.
  * maximum packet size is the same for all endpoints, at
  * ‘USBD_EP0_MAX_SIZE’ octets.
  */
+#if 0
 #define EP0_TX_ADDR 0x20
-#define EP0_RX_ADDR (0x40+(USBD_EP0_MAX_SIZE/2))
+#define EP0_RX_ADDR (EP0_TX_ADDR+(USBD_EP0_MAX_SIZE/2))
+#else
+#define EP0_TX_ADDR 0x40
+#define EP0_RX_ADDR (EP0_TX_ADDR+USBD_EP0_MAX_SIZE)
+#endif
 
 #endif /* __USBD_CONF_H */
