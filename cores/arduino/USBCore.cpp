@@ -6,6 +6,7 @@ extern "C" {
 #include "gd32/usb.h"
 #include "usbd_enum.h"
 #include "usbd_lld_regs.h"
+#include "usbd_transc.h"
 }
 
 #define USBD_VID 0xdead
@@ -110,6 +111,7 @@ static uint8_t class_core_init(usb_dev* usbd, uint8_t config_index)
    * Endpoint 0 is configured during startup, so skip it and only
    * handle what’s configured by ‘PluggableUSB’.
    */
+  uint32_t buf_offset = EP0_RX_ADDR;
   for (uint8_t ep = 1; ep < PluggableUSB().epCount(); ep++) {
     usb_desc_ep ep_desc = {
       .header = {
@@ -125,8 +127,14 @@ static uint8_t class_core_init(usb_dev* usbd, uint8_t config_index)
      * Assume all endpoints have a max packet length of
      * ‘USBD_EP0_MAX_SIZE’.
      */
-    uint32_t buf_offset = EP0_RX_ADDR + (ep * USBD_EP0_MAX_SIZE/2);
+#if 0
+    buf_offset += USBD_EP0_MAX_SIZE/2;
+    assert(buf_offset <= (0x5fff - USBD_EP0_MAX_SIZE/2));
+#else
+    buf_offset += USBD_EP0_MAX_SIZE;
+#endif
     usbd->drv_handler->ep_setup(usbd, EP_BUF_SNG, buf_offset, &ep_desc);
+    assert(buf_offset <= (0x5fff - USBD_EP0_MAX_SIZE));
   }
   return USBD_OK;
 }
@@ -157,7 +165,7 @@ static uint8_t class_core_req_process(usb_dev* usbd, usb_req* req)
     }
   }
   if (data_sent) {
-    USB_Flush(0);
+    USBCore().flush(0);
   }
   return REQ_SUPP;
 }
@@ -222,27 +230,25 @@ size_t EPBuffer<L>::remaining() {
 
 template<size_t L>
 void EPBuffer<L>::flush(uint8_t ep) {
-  //  Serial.println("flush");
+  Serial.print("f");
+  if (this->txWaiting) {
+    /*
+     * Busy loop until the previous IN transaction completes.
+     */
+    this->waitForWriteComplete(ep);
+  }
   this->txWaiting = true;
   usbd.drv_handler->ep_write(this->buf, ep, this->len());
-
-  /*
-   * Busy loop until the IN transaction completes.
-   */
-  this->waitForWriteComplete(ep);
+  this->reset();
 }
 
 template<size_t L>
 void EPBuffer<L>::markComplete() {
-  //  Serial.println("comp");
+  Serial.println("c");
   this->txWaiting = false;
 }
 
 // Busy loop until an OUT packet is received on endpoint ‘ep’.
-//
-// Does not modify register flags. Once this function returns, it will
-// continue to return without waiting until ‘clearDataReady’ is
-// called.
 template<size_t L>
 void EPBuffer<L>::waitForDataReady(uint8_t ep)
 {
@@ -251,8 +257,8 @@ void EPBuffer<L>::waitForDataReady(uint8_t ep)
     uint8_t ep_num = int_status & INTF_EPNUM;
     if ((int_status & INTF_STIF) == INTF_STIF
         && (int_status & INTF_DIR) == INTF_DIR
-        && ep_num == ep
-        && USBD_EPxCS(ep_num) & EPxCS_RX_ST) {
+        && (USBD_EPxCS(ep_num) & EPxCS_RX_ST) == EPxCS_RX_ST
+        && ep_num == ep) {
       USBD_EP_RX_ST_CLEAR(ep);
       this->markComplete();
     }
@@ -261,10 +267,6 @@ void EPBuffer<L>::waitForDataReady(uint8_t ep)
 
 // Busy loop until the latest IN packet has been sent from endpoint
 // ‘ep’.
-//
-// Does not modify register flags. Once this function returns, it will
-// continue to return without waiting until ‘clearWriteComplete’ is
-// called.
 template<size_t L>
 void EPBuffer<L>::waitForWriteComplete(uint8_t ep)
 {
@@ -278,8 +280,8 @@ void EPBuffer<L>::waitForWriteComplete(uint8_t ep)
     uint8_t ep_num = int_status & INTF_EPNUM;
     if ((int_status & INTF_STIF) == INTF_STIF
         && (int_status & INTF_DIR) == 0
-        && ep_num == ep
-        && USBD_EPxCS(ep_num) & EPxCS_TX_ST) {
+        && (USBD_EPxCS(ep_num) & EPxCS_TX_ST) == EPxCS_TX_ST
+        && ep_num == ep) {
       USBD_EP_TX_ST_CLEAR(ep);
       this->markComplete();
     }
@@ -306,8 +308,8 @@ USBCore_::USBCore_()
 
 void USBCore_::connect()
 {
-  //  Serial.begin(115200);
-  //  Serial.println("connect");
+  Serial.begin(115200);
+  Serial.println("connect");
   usb_connect();
 }
 
@@ -377,6 +379,9 @@ int USBCore_::send(uint8_t ep, const void* d, int len)
   auto flags = ep & 0xf0;
   ep &= 0x7;
   auto wrote = 0;
+
+  auto transc = &usbd.transc_in[ep];
+  usb_transc_config(transc, nullptr, 0, 0);
 
   // TODO: query the endpoint for its max packet length.
   while (wrote < len) {
@@ -449,18 +454,19 @@ void USBCore_::transcUnknownHelper(usb_dev* usbd, uint8_t ep)
 
 // Called in interrupt context.
 void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep) {
-  //  Serial.print("S");
+  Serial.print("S");
   usb_reqsta reqstat = REQ_NOTSUPP;
 
   uint16_t count = usbd->drv_handler->ep_read((uint8_t *)(&usbd->control.req), 0, (uint8_t)EP_BUF_SNG);
 
   if (count != USB_SETUP_PACKET_LEN) {
+    Serial.print("!");
     usbd_ep_stall(usbd, 0);
 
     return;
   }
 
-  //  Serial.print(".");
+  Serial.print(".");
   this->maxWrite = usbd->control.req.wLength;
   switch (usbd->control.req.bmRequestType & USB_REQTYPE_MASK) {
     /* standard device request */
@@ -468,11 +474,15 @@ void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep) {
     if (usbd->control.req.bRequest == USB_GET_DESCRIPTOR
         && (usbd->control.req.bmRequestType & USB_RECPTYPE_MASK) == USB_RECPTYPE_DEV
         && (usbd->control.req.wValue >> 8) == USB_DESCTYPE_CONFIG) {
-      //      Serial.println("confdesc");
+      Serial.println("confdesc");
       this->sendDeviceConfigDescriptor(usbd);
       return;
+    } else if ((usbd->control.req.bmRequestType & USB_RECPTYPE_MASK) == USB_RECPTYPE_ITF) {
+      Serial.println("itfdesc");
+      class_core_req_process(usbd, &usbd->control.req);
+      return;
     } else {
-      //      Serial.println("stddesc");
+      Serial.println("stddesc");
       reqstat = usbd_standard_request(usbd, &usbd->control.req);
     }
     break;
@@ -480,14 +490,14 @@ void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep) {
     /* device class request */
   case USB_REQTYPE_CLASS:
     // Calls into class_core->req_process, does nothing else.
-    //    Serial.println("classdesc");
+    Serial.println("classdesc");
     reqstat = usbd_class_request(usbd, &usbd->control.req);
     break;
 
     /* vendor defined request */
   case USB_REQTYPE_VENDOR:
     // Does nothing.
-    //    Serial.println("vendordesc");
+    Serial.println("vendordesc");
     reqstat = usbd_vendor_request(usbd, &usbd->control.req);
     break;
 
