@@ -136,6 +136,8 @@ static uint8_t class_core_init(usb_dev* usbd, uint8_t config_index)
     buf_offset += USBD_EP0_MAX_SIZE;
     assert(buf_offset <= (0x5fff - USBD_EP0_MAX_SIZE));
 #endif
+    usbd->ep_transc[ep][TRANSC_IN] = USBCore_::transcInHelper;
+    usbd->ep_transc[ep][TRANSC_OUT] = USBCore_::transcOutHelper;
     usbd->drv_handler->ep_setup(usbd, EP_BUF_SNG, buf_offset, &ep_desc);
   }
   return USBD_OK;
@@ -163,7 +165,7 @@ static uint8_t class_core_req_process(usb_dev* usbd, usb_req* req)
     }
   } else {
     if (PluggableUSB().setup(setup)) {
-      data_sent = true;
+      //data_sent = true;
     }
   }
   if (data_sent) {
@@ -230,8 +232,13 @@ size_t EPBuffer<L>::remaining() {
   return this->tail - this->p;
 }
 
+int fl = 0;
+int wfrc = 0;
+int mc = 0;
+
 template<size_t L>
 void EPBuffer<L>::flush(uint8_t ep) {
+  fl++;
   Serial.print("f");
   if (this->txWaiting) {
     /*
@@ -246,6 +253,7 @@ void EPBuffer<L>::flush(uint8_t ep) {
 
 template<size_t L>
 void EPBuffer<L>::markComplete() {
+  mc++;
   Serial.println("c");
   this->txWaiting = false;
 }
@@ -272,6 +280,7 @@ void EPBuffer<L>::waitForDataReady(uint8_t ep)
 template<size_t L>
 void EPBuffer<L>::waitForWriteComplete(uint8_t ep)
 {
+  wfrc++;
   /*
    * I’m not sure how much of this is necessary, but this is the
    * series of checks that’s used by ‘usbd_isr’ to verify the IN
@@ -340,6 +349,7 @@ int USBCore_::sendControl(uint8_t flags, const void* d, int len)
 int USBCore_::recvControl(void* d, int len)
 {
   auto read = 0;
+  return read;
   while (read < len) {
     usbd.drv_handler->ep_rx_enable(&usbd, 0);
     // TODO: use epBufs
