@@ -68,7 +68,7 @@ public:
   int recv(uint8_t ep);
   int flush(uint8_t ep);
 
-private:
+  //private:
   EPBuffer<USBD_EP0_MAX_SIZE> epBufs[EP_COUNT];
   // TODO: verify that this only applies to the control endpoint’s use of wLength
   // I think this is only on the setup packet, so it should be fine.
