@@ -1,0 +1,3 @@
+break usbd_lld_int.c:159
+break USBCore_::send
+break BootKeyboard_::sendReport
