@@ -10,7 +10,7 @@ SERIAL = /dev/serial/by-id/usb-ARM_DAPLink_CMSIS-DAP_310436023138373112393334373
 
 #USB_VID_PID = 0xdead:0xbeef
 
-COMPILE_FLAGS = -b $(FQBN) --build-property "runtime.tools.xpack-arm-none-eabi-gcc-9.3.1-1.3.path=$(GCC_PREFIX)" --output-dir "$(OUTPUT_PATH)"
+COMPILE_FLAGS = -b $(FQBN) --build-property "runtime.tools.xpack-arm-none-eabi-gcc-9.3.1-1.3.path=$(GCC_PREFIX)" --output-dir "$(OUTPUT_PATH)" --warnings all --verbose
 
 ifdef USB_VID_PID
 COMPILE_FLAGS += --vid-pid $(USB_VID_PID)
