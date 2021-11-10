@@ -10,9 +10,9 @@ extern "C" {
  * Macros for encoding the endpoint into a 16-bit integer containing
  * the endpoint’s direction, and type.
  */
-#define EPTYPE(dir, type)   ((dir << 8) | type)
-#define EPTYPE_DIR(eptype)  (eptype >> 8)
-#define EPTYPE_TYPE(eptype) (eptype & 0xff)
+#define EPTYPE(dir, type)   ((uint16_t)((dir << 8) | type))
+#define EPTYPE_DIR(eptype)  ((uint8_t)(eptype >> 8))
+#define EPTYPE_TYPE(eptype) ((uint8_t)(eptype & 0xff))
 
 /*
  * Mappings from Arduino USB API to USBCore singleton functions.
@@ -58,13 +58,13 @@ public:
 
   void connect();
 
-  int sendControl(uint8_t flags, const void* d, int len);
+  int sendControl(uint8_t flags, const void* data, int len);
   int recvControl(void* d, int len);
   int recvControlLong(void* d, int len);
   uint8_t available(uint8_t ep);
   uint8_t sendSpace(uint8_t ep);
-  int send(uint8_t ep, const void* d, int len);
-  int recv(uint8_t ep, void* d, int len);
+  int send(uint8_t ep, const void* data, int len);
+  int recv(uint8_t ep, void* data, int len);
   int recv(uint8_t ep);
   int flush(uint8_t ep);
 
@@ -98,7 +98,7 @@ public:
   void transcIn(usb_dev* usbd, uint8_t ep);
   void transcUnknown(usb_dev* usbd, uint8_t ep);
 
-  void sendDeviceConfigDescriptor(usb_dev* usbd);
+  void sendDeviceConfigDescriptor();
 
   void sendZLP(usb_dev* usbd, uint8_t ep);
 };
