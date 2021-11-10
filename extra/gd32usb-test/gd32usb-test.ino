@@ -7,7 +7,7 @@ void setup()
 
 				pinMode(LED2, OUTPUT);
 
-				BootKeyboard.begin();
+				Keyboard.begin();
 }
 
 int f = 0;
@@ -18,13 +18,13 @@ void loop()
 				digitalWrite(LED2, HIGH);
 				delay(500);
 
-				BootKeyboard.press(HID_KEYBOARD_A_AND_A);
+				Keyboard.press(HID_KEYBOARD_A_AND_A);
 				f++;
-				BootKeyboard.sendReport();
+				Keyboard.sendReport();
 				f++;
-				BootKeyboard.releaseAll();
+				Keyboard.releaseAll();
 				f++;
-				BootKeyboard.sendReport();
+				Keyboard.sendReport();
 				f++;
 
 				Serial.println("Off");
