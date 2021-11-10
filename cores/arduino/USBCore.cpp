@@ -19,6 +19,14 @@ extern "C" {
 #define USB_PID 0xbeef
 #endif
 
+/*
+ * #defines from Arduino:
+ *   USB_MANUFACTURER
+ *   USB_PRODUCT
+ * These are both C-strings, not utf16, which is needed by USB; so
+ * they need to be converted.
+ */
+
 #define STR_IDX_LANGID 0
 #define STR_IDX_MFC 1
 #define STR_IDX_PRODUCT 2
@@ -102,7 +110,8 @@ static usb_desc_str serial_string = {
   .header = {
     .bLength         = USB_STRING_LEN(12),
     .bDescriptorType = USB_DESCTYPE_STR,
-  }
+  },
+  .unicode_string = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 };
 
 static uint8_t* usbd_hid_strings[] = {
@@ -121,19 +130,22 @@ usb_desc desc = {
 
 static uint8_t class_core_init(usb_dev* usbd, uint8_t config_index)
 {
+  (void)config_index;
+
   /*
    * Endpoint 0 is configured during startup, so skip it and only
    * handle what’s configured by ‘PluggableUSB’.
    */
   uint32_t buf_offset = EP0_RX_ADDR;
   for (uint8_t ep = 1; ep < PluggableUSB().epCount(); ep++) {
+    uint16_t epBufferInfo = *(uint16_t*)epBuffer(ep);
     usb_desc_ep ep_desc = {
       .header = {
         .bLength = sizeof(ep_desc),
         .bDescriptorType = USB_DESCTYPE_EP,
       },
-      .bEndpointAddress = EPTYPE_DIR(*(uint16_t *)epBuffer(ep)) | ep,
-      .bmAttributes = EPTYPE_TYPE(*(uint16_t *)epBuffer(ep)),
+      .bEndpointAddress = EPTYPE_DIR(epBufferInfo) | ep,
+      .bmAttributes = EPTYPE_TYPE(epBufferInfo),
       .wMaxPacketSize = USBD_EP0_MAX_SIZE,
       .bInterval = 0,
     };
@@ -159,12 +171,16 @@ static uint8_t class_core_deinit(usb_dev* usbd, uint8_t config_index)
 {
   // TODO: Called when SetConfiguration setup packet sets the configuration
   // to 0.
+  (void)usbd;
+  (void)config_index;
   return USBD_OK;
 }
 
 // Called when ep0 gets a SETUP packet after configuration.
 static uint8_t class_core_req_process(usb_dev* usbd, usb_req* req)
 {
+  (void)usbd;
+
   bool data_sent = false;
   arduino::USBSetup setup;
   memcpy(&setup, req, sizeof(setup));
@@ -189,29 +205,36 @@ static uint8_t class_core_req_process(usb_dev* usbd, usb_req* req)
 // Called when ep0 is done sending all data from an IN stage.
 static uint8_t class_core_ctlx_in(usb_dev* usbd)
 {
+  (void)usbd;
   return REQ_SUPP;
 }
 
 // Called when ep0 is done receiving all data from an OUT stage.
 static uint8_t class_core_ctlx_out(usb_dev* usbd)
 {
+  (void)usbd;
   return REQ_SUPP;
 }
 
 // Appears to be unused in usbd library, but used in usbfs.
-static void class_core_data_in(usb_dev* usbd, uint8_t ep_num)
+static void class_core_data_in(usb_dev* usbd, uint8_t ep)
 {
+  (void)usbd;
+  (void)ep;
   return;
 }
 
 // Appears to be unused in usbd library, but used in usbfs.
-static void class_core_data_out(usb_dev* usbd, uint8_t ep_num)
+static void class_core_data_out(usb_dev* usbd, uint8_t ep)
 {
+  (void)usbd;
+  (void)ep;
   return;
 }
 
 usb_class class_core = {
-  .req_cmd	= 0xFFU,
+  .req_cmd	= 0xff,
+  .req_altset   = 0x0,
   .init		= class_core_init,
   .deinit	= class_core_deinit,
   .req_process	= class_core_req_process,
@@ -339,8 +362,11 @@ void USBCore_::connect()
 // Send ‘len’ octets of ‘d’ through the control pipe (endpoint 0).
 // Blocks until ‘len’ octets are sent. Returns the number of octets
 // sent, or -1 on error.
-int USBCore_::sendControl(uint8_t flags, const void* d, int len)
+int USBCore_::sendControl(uint8_t flags, const void* data, int len)
 {
+  // TODO: parse out flags like we do for ‘send’.
+  (void)flags;
+  uint8_t* d = (uint8_t*)data;
   auto l = min(len, this->maxWrite);
   auto wrote = 0;
   while (wrote < l) {
@@ -380,6 +406,8 @@ int USBCore_::recvControl(void* d, int len)
 // the function prototype.
 int USBCore_::recvControlLong(void* d, int len)
 {
+  (void)d;
+  (void)len;
   return -1;
 }
 
@@ -397,8 +425,9 @@ uint8_t USBCore_::sendSpace(uint8_t ep)
 
 // Blocking send of data to an endpoint. Returns the number of octets
 // sent, or -1 on error.
-int USBCore_::send(uint8_t ep, const void* d, int len)
+int USBCore_::send(uint8_t ep, const void* data, int len)
 {
+  uint8_t* d = (uint8_t*)data;
   // Top nybble is used for flags.
   auto flags = ep & 0xf0;
   ep &= 0x7;
@@ -436,6 +465,9 @@ int USBCore_::send(uint8_t ep, const void* d, int len)
 // error.
 int USBCore_::recv(uint8_t ep, void* d, int len)
 {
+  (void)ep;
+  (void)d;
+  (void)len;
   return -1;
 }
 
@@ -443,6 +475,7 @@ int USBCore_::recv(uint8_t ep, void* d, int len)
 // available.
 int USBCore_::recv(uint8_t ep)
 {
+  (void)ep;
   return -1;
 }
 
@@ -450,6 +483,7 @@ int USBCore_::recv(uint8_t ep)
 int USBCore_::flush(uint8_t ep)
 {
   this->epBufs[ep].flush(ep);
+  return 0;
 }
 
 void USBCore_::transcSetupHelper(usb_dev* usbd, uint8_t ep)
@@ -478,6 +512,8 @@ void USBCore_::transcUnknownHelper(usb_dev* usbd, uint8_t ep)
 
 // Called in interrupt context.
 void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep) {
+  (void)ep;
+
   Serial.print("S");
   usb_reqsta reqstat = REQ_NOTSUPP;
 
@@ -499,7 +535,7 @@ void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep) {
         && (usbd->control.req.bmRequestType & USB_RECPTYPE_MASK) == USB_RECPTYPE_DEV
         && (usbd->control.req.wValue >> 8) == USB_DESCTYPE_CONFIG) {
       Serial.println("confdesc");
-      this->sendDeviceConfigDescriptor(usbd);
+      this->sendDeviceConfigDescriptor();
       return;
     } else if ((usbd->control.req.bmRequestType & USB_RECPTYPE_MASK) == USB_RECPTYPE_ITF) {
       Serial.println("itfdesc");
@@ -562,7 +598,7 @@ void USBCore_::transcUnknown(usb_dev* usbd, uint8_t ep) {
   this->oldTranscUnknown(usbd, ep);
 }
 
-void USBCore_::sendDeviceConfigDescriptor(usb_dev* usbd)
+void USBCore_::sendDeviceConfigDescriptor()
 {
   auto oldMaxWrite = this->maxWrite;
   this->maxWrite = 0;
@@ -582,7 +618,7 @@ void USBCore_::sendDeviceConfigDescriptor(usb_dev* usbd)
 
 void USBCore_::sendZLP(usb_dev* usbd, uint8_t ep)
 {
-  usbd->drv_handler->ep_write(nullptr, 0, 0);
+  usbd->drv_handler->ep_write(nullptr, ep, 0);
 }
 
 USBCore_& USBCore()
