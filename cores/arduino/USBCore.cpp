@@ -24,6 +24,12 @@ extern "C" {
 #define STR_IDX_PRODUCT 2
 #define STR_IDX_SERIAL 3
 
+// bMaxPower in Configuration Descriptor
+#define USB_CONFIG_POWER_MA(mA)                ((mA)/2)
+#ifndef USB_CONFIG_POWER
+ #define USB_CONFIG_POWER                      (500)
+#endif
+
 // TODO: make the device descriptor a member variable which can be
 // overridden by subclasses.
 static usb_desc_dev devDesc = {
@@ -60,7 +66,7 @@ usb_desc_config configDesc = {
   .bConfigurationValue = 1,
   .iConfiguration = 0,
   .bmAttributes = 0b10000000,
-  .bMaxPower = 50
+  .bMaxPower = USB_CONFIG_POWER_MA(USB_CONFIG_POWER)
 };
 
 /* USB language ID Descriptor */
