@@ -11,8 +11,13 @@ extern "C" {
 
 #include <cassert>
 
-#define USBD_VID 0xdead
-#define USBD_PID 0xbeef
+#ifndef USB_VID
+#define USB_VID 0x1209
+#endif
+
+#ifndef USB_PID
+#define USB_PID 0xbeef
+#endif
 
 #define STR_IDX_LANGID 0
 #define STR_IDX_MFC 1
@@ -33,8 +38,8 @@ static usb_desc_dev devDesc = {
   // TODO: this depends on what the mcu can support, but this is
   // device dependent code, so nevermind?
   .bMaxPacketSize0       = USBD_EP0_MAX_SIZE,
-  .idVendor              = USBD_VID,
-  .idProduct             = USBD_PID,
+  .idVendor              = USB_VID,
+  .idProduct             = USB_PID,
   .bcdDevice             = 0x0100,
   // Can set these to 0 so they’ll be ignored.
   .iManufacturer         = STR_IDX_MFC,
