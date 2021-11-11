@@ -31,13 +31,7 @@ keyboardio_model_100.build.usb_manufacturer="Keyboardio"
 
 
 #Upload menu
-keyboardio_model_100.menu.upload_method.stlinkMethod=STLink (SWD)
-keyboardio_model_100.menu.upload_method.stlinkMethod.upload.protocol=stlink
-keyboardio_model_100.menu.upload_method.stlinkMethod.upload.options=
-keyboardio_model_100.menu.upload_method.stlinkMethod.build.upload_flags=-DCONFIG_MAPLE_MINI_NO_DISABLE_DEBUG=1 -DSERIAL_USB -DGENERIC_BOOTLOADER
-keyboardio_model_100.menu.upload_method.stlinkMethod.upload.tool=stlink_upload
-keyboardio_model_100.upload.tool.default=stlink_upload
-
+keyboardio_model_100.upload.tool.default=dfu-util
 keyboardio_model_100.menu.upload_method.dfuUtilMethod=dfu-util (DFU - Keyboardio DAPBoot bootloader)
 keyboardio_model_100.menu.upload_method.dfuUtilMethod.upload.protocol=dfu
 keyboardio_model_100.menu.upload_method.dfuUtilMethod.upload.tool=dfu-util
@@ -46,3 +40,8 @@ keyboardio_model_100.menu.upload_method.dfuUtilMethod.build.flash_offset=0x2000
 keyboardio_model_100.menu.upload_method.dfuUtilMethod.upload.pid=0x0005
 keyboardio_model_100.menu.upload_method.dfuUtilMethod.upload.vid=0x3496
 
+keyboardio_model_100.menu.upload_method.stlinkMethod=STLink (SWD)
+keyboardio_model_100.menu.upload_method.stlinkMethod.upload.protocol=stlink
+keyboardio_model_100.menu.upload_method.stlinkMethod.upload.options=
+keyboardio_model_100.menu.upload_method.stlinkMethod.build.upload_flags=-DCONFIG_MAPLE_MINI_NO_DISABLE_DEBUG=1 -DSERIAL_USB -DGENERIC_BOOTLOADER
+keyboardio_model_100.menu.upload_method.stlinkMethod.upload.tool=stlink_upload
