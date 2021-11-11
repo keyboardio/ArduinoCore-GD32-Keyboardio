@@ -17,7 +17,7 @@ extern "C" {
 /*
  * Mappings from Arduino USB API to USBCore singleton functions.
  */
-#define TRANSFER_PGM     0x00
+#define TRANSFER_PGM     0x80
 #define TRANSFER_ZERO    0x20
 #define TRANSFER_RELEASE 0x40
 
@@ -99,6 +99,9 @@ public:
   void transcUnknown(usb_dev* usbd, uint8_t ep);
 
   void sendDeviceConfigDescriptor();
+  void sendDeviceStringDescriptor();
+
+  void sendStringDesc(const char *str);
 
   void sendZLP(usb_dev* usbd, uint8_t ep);
 };

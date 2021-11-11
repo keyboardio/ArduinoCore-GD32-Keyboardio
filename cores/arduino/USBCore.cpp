@@ -69,35 +69,8 @@ usb_desc_config configDesc = {
   .bMaxPower = USB_CONFIG_POWER_MA(USB_CONFIG_POWER)
 };
 
-/* USB language ID Descriptor */
-const usb_desc_LANGID usbd_language_id_desc = {
-  .header = {
-    .bLength         = sizeof(usb_desc_LANGID),
-    .bDescriptorType = USB_DESCTYPE_STR
-  },
-  .wLANGID = ENG_LANGID
-};
-
-/* USB manufacture string */
-static const usb_desc_str manufacturer_string = {
-  .header = {
-    .bLength         = USB_STRING_LEN(7),
-    .bDescriptorType = USB_DESCTYPE_STR,
-  },
-  .unicode_string = {'A', 'r', 'd', 'u', 'i', 'n', 'o'}
-};
-
-/* USB product string */
-static const usb_desc_str product_string = {
-  .header = {
-    .bLength         = USB_STRING_LEN(8),
-    .bDescriptorType = USB_DESCTYPE_STR,
-  },
-  .unicode_string = {'U', 'S', 'B', ' ', 't', 'e', 's', 't'}
-};
-
 /* USBD serial string */
-static usb_desc_str serial_string = {
+static usb_desc_str serialDesc = {
   .header = {
     .bLength         = USB_STRING_LEN(12),
     .bDescriptorType = USB_DESCTYPE_STR,
@@ -105,18 +78,22 @@ static usb_desc_str serial_string = {
   .unicode_string = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 };
 
-static uint8_t* usbd_hid_strings[] = {
-  [STR_IDX_LANGID]  = (uint8_t *)&usbd_language_id_desc,
-  [STR_IDX_MFC]     = (uint8_t *)&manufacturer_string,
-  [STR_IDX_PRODUCT] = (uint8_t *)&product_string,
-  [STR_IDX_SERIAL]  = (uint8_t *)&serial_string
+/*
+ * We need to keep the pointer for ‘STR_IDX_SERIAL’ because it’s
+ * filled in by ‘usbd_init’.
+ */
+static uint8_t* stringDescs[] = {
+  [STR_IDX_LANGID]  = nullptr,
+  [STR_IDX_MFC]     = nullptr,
+  [STR_IDX_PRODUCT] = nullptr,
+  [STR_IDX_SERIAL]  = (uint8_t *)&serialDesc
 };
 
 usb_desc desc = {
   .dev_desc    = (uint8_t *)&devDesc,
   .config_desc = (uint8_t *)&configDesc,
   .bos_desc    = nullptr,
-  .strings     = usbd_hid_strings
+  .strings     = stringDescs
 };
 
 static uint8_t class_core_init(usb_dev* usbd, uint8_t config_index)
@@ -236,7 +213,8 @@ usb_class class_core = {
 };
 
 template<size_t L>
-size_t EPBuffer<L>::push(const void *d, size_t len) {
+size_t EPBuffer<L>::push(const void *d, size_t len)
+{
   size_t w = min(this->remaining(), len);
   memcpy(this->p, d, w);
   this->p += w;
@@ -244,17 +222,20 @@ size_t EPBuffer<L>::push(const void *d, size_t len) {
 }
 
 template<size_t L>
-void EPBuffer<L>::reset() {
+void EPBuffer<L>::reset()
+{
   this->p = this->buf;
 }
 
 template<size_t L>
-size_t EPBuffer<L>::len() {
+size_t EPBuffer<L>::len()
+{
   return this->p - this->buf;
 }
 
 template<size_t L>
-size_t EPBuffer<L>::remaining() {
+size_t EPBuffer<L>::remaining()
+{
   return this->tail - this->p;
 }
 
@@ -263,7 +244,8 @@ int wfrc = 0;
 int mc = 0;
 
 template<size_t L>
-void EPBuffer<L>::flush(uint8_t ep) {
+void EPBuffer<L>::flush(uint8_t ep)
+{
   fl++;
   Serial.print("f");
   if (this->txWaiting) {
@@ -278,7 +260,8 @@ void EPBuffer<L>::flush(uint8_t ep) {
 }
 
 template<size_t L>
-void EPBuffer<L>::markComplete() {
+void EPBuffer<L>::markComplete()
+{
   mc++;
   Serial.println("c");
   this->txWaiting = false;
@@ -502,7 +485,8 @@ void USBCore_::transcUnknownHelper(usb_dev* usbd, uint8_t ep)
 }
 
 // Called in interrupt context.
-void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep) {
+void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep)
+{
   (void)ep;
 
   Serial.print("S");
@@ -527,6 +511,12 @@ void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep) {
         && (usbd->control.req.wValue >> 8) == USB_DESCTYPE_CONFIG) {
       Serial.println("confdesc");
       this->sendDeviceConfigDescriptor();
+      return;
+    } else if (usbd->control.req.bRequest == USB_GET_DESCRIPTOR
+               && (usbd->control.req.bmRequestType & USB_RECPTYPE_MASK) == USB_RECPTYPE_DEV
+               && (usbd->control.req.wValue >> 8) == USB_DESCTYPE_STR) {
+      Serial.println("strdesc");
+      this->sendDeviceStringDescriptor();
       return;
     } else if ((usbd->control.req.bmRequestType & USB_RECPTYPE_MASK) == USB_RECPTYPE_ITF) {
       Serial.println("itfdesc");
@@ -574,18 +564,21 @@ void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep) {
 }
 
 // Called in interrupt context.
-void USBCore_::transcOut(usb_dev* usbd, uint8_t ep) {
+void USBCore_::transcOut(usb_dev* usbd, uint8_t ep)
+{
   this->epBufs[ep].markComplete();
   this->oldTranscOut(usbd, ep);
 }
 
 // Called in interrupt context.
-void USBCore_::transcIn(usb_dev* usbd, uint8_t ep) {
+void USBCore_::transcIn(usb_dev* usbd, uint8_t ep)
+{
   this->epBufs[ep].markComplete();
   this->oldTranscIn(usbd, ep);
 }
 
-void USBCore_::transcUnknown(usb_dev* usbd, uint8_t ep) {
+void USBCore_::transcUnknown(usb_dev* usbd, uint8_t ep)
+{
   this->oldTranscUnknown(usbd, ep);
 }
 
@@ -605,6 +598,53 @@ void USBCore_::sendDeviceConfigDescriptor()
   // TODO: verify this sends ZLP properly when:
   //   wTotalLength % sizeof(this->buf) == 0
   this->flush(0);
+}
+
+void USBCore_::sendDeviceStringDescriptor()
+{
+  switch (lowByte(usbd.control.req.wValue)) {
+  case STR_IDX_LANGID: {
+    const usb_desc_LANGID desc = {
+      .header = {
+        .bLength = sizeof(usb_desc_LANGID),
+        .bDescriptorType = USB_DESCTYPE_STR
+      },
+      .wLANGID = ENG_LANGID
+    };
+    USBCore().sendControl(0, &desc, desc.header.bLength);
+    USBCore().flush(0);
+    return;
+  }
+  case STR_IDX_MFC:
+    this->sendStringDesc(USB_MANUFACTURER);
+    break;
+  case STR_IDX_PRODUCT:
+    this->sendStringDesc(USB_PRODUCT);
+    break;
+  case STR_IDX_SERIAL:
+    USBCore().sendControl(0, &serialDesc, serialDesc.header.bLength);
+    USBCore().flush(0);
+    break;
+  default:
+    usbd.drv_handler->ep_stall_set(&usbd, 0);
+    return;
+  }
+}
+
+void USBCore_::sendStringDesc(const char *str)
+{
+  usb_desc_header header = {
+    .bLength = sizeof(header) + strlen(str) * 2,
+    .bDescriptorType = USB_DESCTYPE_STR
+  };
+
+  USBCore().sendControl(0, &header, sizeof(header));
+  for (size_t i = 0; i < strlen(str); i++) {
+    uint8_t zero = 0;
+    USBCore().sendControl(0, &str[i], sizeof(str[i]));
+    USBCore().sendControl(0, &zero, sizeof(zero));
+  }
+  USBCore().flush(0);
 }
 
 void USBCore_::sendZLP(usb_dev* usbd, uint8_t ep)
