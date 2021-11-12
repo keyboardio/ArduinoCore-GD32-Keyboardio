@@ -11,8 +11,6 @@ void setup()
     Mouse.begin();
 }
 
-int f = 0;
-
 void loop()
 {
     Serial.println("On");
