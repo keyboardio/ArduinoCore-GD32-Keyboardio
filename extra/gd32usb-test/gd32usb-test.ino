@@ -8,6 +8,7 @@ void setup()
 				pinMode(LED2, OUTPUT);
 
 				Keyboard.begin();
+				Mouse.begin();
 }
 
 int f = 0;
@@ -16,6 +17,18 @@ void loop()
 {
 				Serial.println("On");
 				digitalWrite(LED2, HIGH);
+				delay(500);
+
+				Mouse.move(10, 0);
+				f++;
+				Mouse.sendReport();
+				f++;
+				Mouse.releaseAll();
+				f++;
+				Mouse.sendReport();
+				f++;
+
+				// Delay long enough to see the mouse move.
 				delay(500);
 
 				Keyboard.press(HID_KEYBOARD_A_AND_A);
@@ -29,5 +42,4 @@ void loop()
 
 				Serial.println("Off");
 				digitalWrite(LED2, LOW);
-				delay(500);
 }
