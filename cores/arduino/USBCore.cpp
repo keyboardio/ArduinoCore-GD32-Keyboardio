@@ -112,7 +112,7 @@ static uint8_t class_core_init(usb_dev* usbd, uint8_t config_index)
         .bLength = sizeof(ep_desc),
         .bDescriptorType = USB_DESCTYPE_EP,
       },
-      .bEndpointAddress = EPTYPE_DIR(epBufferInfo) | ep,
+      .bEndpointAddress = (uint8_t)(EPTYPE_DIR(epBufferInfo) | ep),
       .bmAttributes = EPTYPE_TYPE(epBufferInfo),
       .wMaxPacketSize = USBD_EP0_MAX_SIZE,
       .bInterval = 0,
@@ -121,13 +121,8 @@ static uint8_t class_core_init(usb_dev* usbd, uint8_t config_index)
      * Assume all endpoints have a max packet length of
      * ‘USBD_EP0_MAX_SIZE’.
      */
-#if 0
-    buf_offset += USBD_EP0_MAX_SIZE/2;
-    assert(buf_offset <= (0x5fff - USBD_EP0_MAX_SIZE/2));
-#else
     buf_offset += USBD_EP0_MAX_SIZE;
-    assert(buf_offset <= (0x5fff - USBD_EP0_MAX_SIZE));
-#endif
+    assert(buf_offset < (0x6000 - USBD_EP0_MAX_SIZE));
     usbd->ep_transc[ep][TRANSC_IN] = USBCore_::transcInHelper;
     usbd->ep_transc[ep][TRANSC_OUT] = USBCore_::transcOutHelper;
     usbd->drv_handler->ep_setup(usbd, EP_BUF_SNG, buf_offset, &ep_desc);
@@ -633,8 +628,10 @@ void USBCore_::sendDeviceStringDescriptor()
 
 void USBCore_::sendStringDesc(const char *str)
 {
+  size_t len = sizeof(usb_desc_header) + strlen(str) * 2;
+  assert(len < 256);
   usb_desc_header header = {
-    .bLength = sizeof(header) + strlen(str) * 2,
+    .bLength = (uint8_t)len,
     .bDescriptorType = USB_DESCTYPE_STR
   };
 
