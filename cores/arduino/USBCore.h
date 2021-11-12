@@ -33,87 +33,92 @@ extern "C" {
 template<size_t L>
 class EPBuffer {
 public:
-  size_t push(const void* d, size_t len);
-  void reset();
-  size_t len();
-  size_t remaining();
-  void flush(uint8_t ep);
-  void markComplete();
+    size_t push(const void* d, size_t len);
+    void reset();
+    size_t len();
+    size_t remaining();
+    void flush(uint8_t ep);
+    void markComplete();
 
 private:
-  void waitForDataReady();
-  void waitForWriteComplete();
+    void waitForDataReady();
+    void waitForWriteComplete();
 
-  uint8_t buf[L];
-  uint8_t* tail = buf + sizeof(buf);
-  uint8_t* p = buf;
+    uint8_t buf[L];
+    uint8_t* tail = buf + sizeof(buf);
+    uint8_t* p = buf;
 
-  // TODO: this should probably be explicitly atomic.
-  volatile bool txWaiting = false;
+    // TODO: this should probably be explicitly atomic.
+    volatile bool txWaiting = false;
+
+    // TODO: remove this debug stuff
+    uint32_t flCount = 0;
+    uint32_t mcCount = 0;
+    uint32_t wfwcCount = 0;
 };
 
 class EPBuffers_ {
 public:
-  EPBuffer<USBD_EP0_MAX_SIZE>& buf(uint8_t ep);
-  void markComplete(uint8_t ep);
+    EPBuffer<USBD_EP0_MAX_SIZE>& buf(uint8_t ep);
+    void markComplete(uint8_t ep);
 
 private:
-  EPBuffer<USBD_EP0_MAX_SIZE> epBufs[EP_COUNT];
+    EPBuffer<USBD_EP0_MAX_SIZE> epBufs[EP_COUNT];
 };
 
 EPBuffers_& EPBuffers();
 
 class USBCore_ {
 public:
-  USBCore_();
+    USBCore_();
 
-  void connect();
+    void connect();
 
-  int sendControl(uint8_t flags, const void* data, int len);
-  int recvControl(void* d, int len);
-  int recvControlLong(void* d, int len);
-  uint8_t available(uint8_t ep);
-  uint8_t sendSpace(uint8_t ep);
-  int send(uint8_t ep, const void* data, int len);
-  int recv(uint8_t ep, void* data, int len);
-  int recv(uint8_t ep);
-  int flush(uint8_t ep);
+    int sendControl(uint8_t flags, const void* data, int len);
+    int recvControl(void* d, int len);
+    int recvControlLong(void* d, int len);
+    uint8_t available(uint8_t ep);
+    uint8_t sendSpace(uint8_t ep);
+    int send(uint8_t ep, const void* data, int len);
+    int recv(uint8_t ep, void* data, int len);
+    int recv(uint8_t ep);
+    int flush(uint8_t ep);
 
-  //private:
-  // TODO: verify that this only applies to the control endpoint’s use of wLength
-  // I think this is only on the setup packet, so it should be fine.
-  uint16_t maxWrite = 0;
+    //private:
+    // TODO: verify that this only applies to the control endpoint’s use of wLength
+    // I think this is only on the setup packet, so it should be fine.
+    uint16_t maxWrite = 0;
 
-  /*
-   * Pointers to the transaction routines specified by ‘usbd_init’.
-   */
-  void (*oldTranscSetup)(usb_dev* usbd, uint8_t ep);
-  void (*oldTranscOut)(usb_dev* usbd, uint8_t ep);
-  void (*oldTranscIn)(usb_dev* usbd, uint8_t ep);
-  void (*oldTranscUnknown)(usb_dev* usbd, uint8_t ep);
+    /*
+     * Pointers to the transaction routines specified by ‘usbd_init’.
+     */
+    void (*oldTranscSetup)(usb_dev* usbd, uint8_t ep);
+    void (*oldTranscOut)(usb_dev* usbd, uint8_t ep);
+    void (*oldTranscIn)(usb_dev* usbd, uint8_t ep);
+    void (*oldTranscUnknown)(usb_dev* usbd, uint8_t ep);
 
-  /*
-   * Static member function helpers called from ISR.
-   *
-   * These pull the core handle from ‘usbd’ and use it to call the
-   * instance member functions.
-   */
-  static void transcSetupHelper(usb_dev* usbd, uint8_t ep);
-  static void transcOutHelper(usb_dev* usbd, uint8_t ep);
-  static void transcInHelper(usb_dev* usbd, uint8_t ep);
-  static void transcUnknownHelper(usb_dev* usbd, uint8_t ep);
+    /*
+     * Static member function helpers called from ISR.
+     *
+     * These pull the core handle from ‘usbd’ and use it to call the
+     * instance member functions.
+     */
+    static void transcSetupHelper(usb_dev* usbd, uint8_t ep);
+    static void transcOutHelper(usb_dev* usbd, uint8_t ep);
+    static void transcInHelper(usb_dev* usbd, uint8_t ep);
+    static void transcUnknownHelper(usb_dev* usbd, uint8_t ep);
 
-  void transcSetup(usb_dev* usbd, uint8_t ep);
-  void transcOut(usb_dev* usbd, uint8_t ep);
-  void transcIn(usb_dev* usbd, uint8_t ep);
-  void transcUnknown(usb_dev* usbd, uint8_t ep);
+    void transcSetup(usb_dev* usbd, uint8_t ep);
+    void transcOut(usb_dev* usbd, uint8_t ep);
+    void transcIn(usb_dev* usbd, uint8_t ep);
+    void transcUnknown(usb_dev* usbd, uint8_t ep);
 
-  void sendDeviceConfigDescriptor();
-  void sendDeviceStringDescriptor();
+    void sendDeviceConfigDescriptor();
+    void sendDeviceStringDescriptor();
 
-  void sendStringDesc(const char *str);
+    void sendStringDesc(const char *str);
 
-  void sendZLP(usb_dev* usbd, uint8_t ep);
+    void sendZLP(usb_dev* usbd, uint8_t ep);
 };
 
 USBCore_& USBCore();
