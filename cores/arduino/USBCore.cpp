@@ -243,12 +243,10 @@ void EPBuffer<L>::flush(uint8_t ep)
 {
   fl++;
   Serial.print("f");
-  if (this->txWaiting) {
-    /*
-     * Busy loop until the previous IN transaction completes.
-     */
-    this->waitForWriteComplete(ep);
-  }
+
+  // Busy loop until the previous IN transaction completes.
+  this->waitForWriteComplete();
+
   this->txWaiting = true;
   usbd.drv_handler->ep_write(this->buf, ep, this->len());
   this->reset();
@@ -264,17 +262,16 @@ void EPBuffer<L>::markComplete()
 
 // Busy loop until an OUT packet is received on endpoint ‘ep’.
 template<size_t L>
-void EPBuffer<L>::waitForDataReady(uint8_t ep)
+void EPBuffer<L>::waitForDataReady()
 {
   while (this->txWaiting) {
     volatile uint16_t int_status = (uint16_t)USBD_INTF;
     uint8_t ep_num = int_status & INTF_EPNUM;
     if ((int_status & INTF_STIF) == INTF_STIF
         && (int_status & INTF_DIR) == INTF_DIR
-        && (USBD_EPxCS(ep_num) & EPxCS_RX_ST) == EPxCS_RX_ST
-        && ep_num == ep) {
-      USBD_EP_RX_ST_CLEAR(ep);
-      this->markComplete();
+        && (USBD_EPxCS(ep_num) & EPxCS_RX_ST) == EPxCS_RX_ST) {
+      USBD_EP_RX_ST_CLEAR(ep_num);
+      EPBuffers().markComplete(ep_num);
     }
   }
 }
@@ -282,7 +279,7 @@ void EPBuffer<L>::waitForDataReady(uint8_t ep)
 // Busy loop until the latest IN packet has been sent from endpoint
 // ‘ep’.
 template<size_t L>
-void EPBuffer<L>::waitForWriteComplete(uint8_t ep)
+void EPBuffer<L>::waitForWriteComplete()
 {
   wfrc++;
   /*
@@ -291,16 +288,28 @@ void EPBuffer<L>::waitForWriteComplete(uint8_t ep)
    * packet has been sent.
    */
   while (this->txWaiting) {
-    volatile uint16_t int_status = (uint16_t)USBD_INTF;
+    uint16_t int_status = (uint16_t)USBD_INTF;
     uint8_t ep_num = int_status & INTF_EPNUM;
     if ((int_status & INTF_STIF) == INTF_STIF
         && (int_status & INTF_DIR) == 0
-        && (USBD_EPxCS(ep_num) & EPxCS_TX_ST) == EPxCS_TX_ST
-        && ep_num == ep) {
-      USBD_EP_TX_ST_CLEAR(ep);
-      this->markComplete();
+        && (USBD_EPxCS(ep_num) & EPxCS_TX_ST) == EPxCS_TX_ST) {
+      USBD_EP_TX_ST_CLEAR(ep_num);
+      EPBuffers().markComplete(ep_num);
     }
   }
+}
+
+EPBuffer<USBD_EP0_MAX_SIZE>& EPBuffers_::buf(uint8_t ep) {
+  return this->epBufs[ep];
+}
+
+void EPBuffers_::markComplete(uint8_t ep) {
+  this->buf(ep).markComplete();
+}
+
+EPBuffers_& EPBuffers() {
+  static EPBuffers_ obj;
+  return obj;
 }
 
 USBCore_::USBCore_()
@@ -339,7 +348,7 @@ int USBCore_::sendControl(uint8_t flags, const void* data, int len)
   auto l = min(len, this->maxWrite);
   auto wrote = 0;
   while (wrote < l) {
-    size_t w = this->epBufs[0].push(d, l - wrote);
+    size_t w = EPBuffers().buf(0).push(d, l - wrote);
     d += w;
     wrote += w;
     this->maxWrite -= w;
@@ -383,13 +392,13 @@ int USBCore_::recvControlLong(void* d, int len)
 // Number of octets available on OUT endpoint.
 uint8_t USBCore_::available(uint8_t ep)
 {
-  return this->epBufs[ep].len();
+  return EPBuffers().buf(ep).len();
 }
 
 // Space left in IN endpoint buffer.
 uint8_t USBCore_::sendSpace(uint8_t ep)
 {
-  return this->epBufs[ep].remaining();
+  return EPBuffers().buf(ep).remaining();
 }
 
 // Blocking send of data to an endpoint. Returns the number of octets
@@ -413,7 +422,7 @@ int USBCore_::send(uint8_t ep, const void* data, int len)
       // TODO: handle writing zeros instead of ‘d’.
       return -1;
     } else {
-      w = this->epBufs[ep].push(d, toWrite);
+      w = EPBuffers().buf(ep).push(d, toWrite);
     }
     d += w;
     wrote += w;
@@ -451,7 +460,7 @@ int USBCore_::recv(uint8_t ep)
 // Flushes an outbound transmission as soon as possible.
 int USBCore_::flush(uint8_t ep)
 {
-  this->epBufs[ep].flush(ep);
+  EPBuffers().buf(ep).flush(ep);
   return 0;
 }
 
@@ -561,14 +570,14 @@ void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep)
 // Called in interrupt context.
 void USBCore_::transcOut(usb_dev* usbd, uint8_t ep)
 {
-  this->epBufs[ep].markComplete();
+  EPBuffers().markComplete(ep);
   this->oldTranscOut(usbd, ep);
 }
 
 // Called in interrupt context.
 void USBCore_::transcIn(usb_dev* usbd, uint8_t ep)
 {
-  this->epBufs[ep].markComplete();
+  EPBuffers().markComplete(ep);
   this->oldTranscIn(usbd, ep);
 }
 

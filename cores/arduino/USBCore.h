@@ -41,8 +41,8 @@ public:
   void markComplete();
 
 private:
-  void waitForDataReady(uint8_t ep);
-  void waitForWriteComplete(uint8_t ep);
+  void waitForDataReady();
+  void waitForWriteComplete();
 
   uint8_t buf[L];
   uint8_t* tail = buf + sizeof(buf);
@@ -51,6 +51,17 @@ private:
   // TODO: this should probably be explicitly atomic.
   volatile bool txWaiting = false;
 };
+
+class EPBuffers_ {
+public:
+  EPBuffer<USBD_EP0_MAX_SIZE>& buf(uint8_t ep);
+  void markComplete(uint8_t ep);
+
+private:
+  EPBuffer<USBD_EP0_MAX_SIZE> epBufs[EP_COUNT];
+};
+
+EPBuffers_& EPBuffers();
 
 class USBCore_ {
 public:
@@ -69,7 +80,6 @@ public:
   int flush(uint8_t ep);
 
   //private:
-  EPBuffer<USBD_EP0_MAX_SIZE> epBufs[EP_COUNT];
   // TODO: verify that this only applies to the control endpoint’s use of wLength
   // I think this is only on the setup packet, so it should be fine.
   uint16_t maxWrite = 0;
