@@ -2,7 +2,7 @@
 
 void setup()
 {
-    //Serial.begin(115200);
+    Serial.begin(115200);
     Serial.println("-- Blink demo --");
 
     pinMode(LED2, OUTPUT);
@@ -22,9 +22,6 @@ void loop()
     BootKeyboard.releaseAll();
     BootKeyboard.sendReport();
 
-    // Delay long enough to see the mouse move.
-    delay(500);
-
     Mouse.move(10, 0);
     Mouse.sendReport();
     Mouse.releaseAll();
@@ -32,4 +29,7 @@ void loop()
 
     Serial.println("Off");
     digitalWrite(LED2, LOW);
+
+    // Delay long enough to see the mouse move.
+    delay(500);
 }
