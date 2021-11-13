@@ -243,8 +243,6 @@ i2c_status_enum i2c_master_transmit(i2c_t *obj, uint8_t address, uint8_t *data, 
     }
 
     i2c_status_enum ret = I2C_OK;
-    uint32_t count = 0;
-
 
 
     if (I2C_BUSY == _i2c_busy_wait(obj)) {
@@ -257,7 +255,7 @@ i2c_status_enum i2c_master_transmit(i2c_t *obj, uint8_t address, uint8_t *data, 
 //       return ret;
 //   }
 
-    for(count = 0; count < length; count++) {
+    for(uint32_t count = 0; count < length; count++) {
         if(I2C_OK != i2c_byte_write(obj, data[count])) {
             ret = I2C_NACK_DATA;
 		// TODO - break out of the loop
