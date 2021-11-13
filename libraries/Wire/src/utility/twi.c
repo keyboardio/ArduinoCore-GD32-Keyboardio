@@ -217,11 +217,11 @@ static int i2c_stop(i2c_t *obj)
     int timeout = FLAG_I2C_TIMEOUT_STOP_BIT_RESET;
     while ((I2C_CTL0(obj_s->i2c) & I2C_CTL0_STOP)) {
         if ((timeout--) == 0) {
-            return 2;
+            return I2C_TIMEOUT;
         }
     }
 
-    return 0;
+    return I2C_OK;
 }
 
 /** Write bytes at a given address
@@ -236,18 +236,21 @@ static int i2c_stop(i2c_t *obj)
 i2c_status_enum i2c_master_transmit(i2c_t *obj, uint8_t address, uint8_t *data, uint16_t length,
                                     uint8_t stop)
 {
+
+
+    /* When size is 0, this is usually an I2C scan / ping to check if device is there and ready */
+    if(length == 0) {
+        return i2c_wait_standby_state(obj, address);
+    } 
+
+    if(length > I2C_BUFFER_SIZE) {
+        return I2C_DATA_TOO_LONG;
+    }
+
     i2c_status_enum ret = I2C_OK;
     uint32_t timeout = 0;
     uint32_t count = 0;
 
-    if (length > I2C_BUFFER_SIZE) {
-        ret = I2C_DATA_TOO_LONG;
-    }
-
-    /* When size is 0, this is usually an I2C scan / ping to check if device is there and ready */
-    if (length == 0) {
-        ret = i2c_wait_standby_state(obj, address);
-    } else {
         timeout = FLAG_I2C_TIMEOUT_BUSY;
         while ((i2c_flag_get(obj->i2c, I2C_FLAG_I2CBSY)) && (--timeout != 0));
         if (0 == timeout) {
@@ -286,7 +289,6 @@ i2c_status_enum i2c_master_transmit(i2c_t *obj, uint8_t address, uint8_t *data, 
         if (stop) {
             i2c_stop(obj);
         }
-    }
     return ret;
 }
 
@@ -462,7 +464,7 @@ i2c_status_enum i2c_wait_standby_state(i2c_t *obj, uint8_t address)
     }
 
     // On failure to send a stop, return the timeout
-    if (i2c_stop(obj)) {
+    if (i2c_stop(obj) != I2C_OK) {
    	return I2C_TIMEOUT;
     }
     
