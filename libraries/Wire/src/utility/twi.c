@@ -186,7 +186,7 @@ void i2c_slaves_interrupt_enable(i2c_t *obj)
  */
 i2c_status_enum i2c_byte_write(i2c_t *obj, int data)
 {
-    int timeout;
+    uint32_t timeout;
     struct i2c_s *obj_s = I2C_S(obj);
 
     I2C_DATA(obj_s->i2c) = (uint8_t)data;
@@ -251,11 +251,12 @@ i2c_status_enum i2c_master_transmit(i2c_t *obj, uint8_t address, uint8_t *data, 
     uint32_t timeout = 0;
     uint32_t count = 0;
 
-    timeout = FLAG_I2C_TIMEOUT_BUSY;
-    while((i2c_flag_get(obj->i2c, I2C_FLAG_I2CBSY)) && (--timeout != 0));
-    if(0 == timeout) {
-        ret = I2C_BUSY;
+
+
+    if (I2C_BUSY == _i2c_busy_wait(obj)) {
+            return I2C_BUSY;
     }
+
     /* generate a START condition */
     i2c_start_on_bus(obj->i2c);
 
@@ -337,13 +338,13 @@ i2c_status_enum i2c_master_receive(i2c_t *obj, uint8_t address, uint8_t *data, u
     uint32_t timeout = 0;
     uint32_t count = 0;
 
-    timeout = FLAG_I2C_TIMEOUT_BUSY;
 
-    while ((i2c_flag_get(obj->i2c, I2C_FLAG_I2CBSY)) && (--timeout != 0));
-    if (0 == timeout) {
-        ret = I2C_BUSY;
+    if (I2C_BUSY == _i2c_busy_wait(obj)) {
+            return I2C_BUSY;
     }
-    if (1 == length) {
+
+
+    if(1 == length) {
         /* disable acknowledge */
         i2c_ack_config(obj->i2c, I2C_ACK_DISABLE);
         /* send a stop condition to I2C bus*/
@@ -417,11 +418,9 @@ i2c_status_enum i2c_wait_standby_state(i2c_t *obj, uint8_t address)
     i2c_status_enum status = I2C_OK;
     uint32_t timeout;
 
-    /* wait until I2C_FLAG_I2CBSY flag is reset */
-    timeout = FLAG_I2C_TIMEOUT_BUSY;
-    while ((i2c_flag_get(obj->i2c, I2C_FLAG_I2CBSY)) && (--timeout != 0));
-    if (0 == timeout) {
-        status = I2C_BUSY;
+
+    if (I2C_BUSY == _i2c_busy_wait(obj)) {
+	    return I2C_BUSY;
     }
 
     /* send a start condition to I2C bus */
@@ -529,6 +528,26 @@ i2c_status_enum i2c_slave_write_buffer(i2c_t *obj, uint8_t *data, uint16_t lengt
         obj_s->tx_buffer_ptr = obj_s->tx_buffer_ptr - length;
     }
     return ret;
+}
+
+
+/** Check the I2C bus to see if it's busy
+ *
+ * @param obj    The I2C object
+ * @returns I2C_BUSY on timeout and I2C_OK otherwise
+ **/
+
+i2c_status_enum _i2c_busy_wait(i2c_t *obj)
+{
+
+    /* wait until I2C_FLAG_I2CBSY flag is reset */
+    uint32_t timeout = FLAG_I2C_TIMEOUT_BUSY;
+    while((i2c_flag_get(obj->i2c, I2C_FLAG_I2CBSY)) && (--timeout != 0));
+    if(0 == timeout) {
+        return I2C_BUSY;
+    }
+
+    return I2C_OK;
 }
 
 #ifdef I2C0
