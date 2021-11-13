@@ -251,44 +251,44 @@ i2c_status_enum i2c_master_transmit(i2c_t *obj, uint8_t address, uint8_t *data, 
     uint32_t timeout = 0;
     uint32_t count = 0;
 
-        timeout = FLAG_I2C_TIMEOUT_BUSY;
-        while ((i2c_flag_get(obj->i2c, I2C_FLAG_I2CBSY)) && (--timeout != 0));
-        if (0 == timeout) {
-            ret = I2C_BUSY;
-        }
-        /* generate a START condition */
-        i2c_start_on_bus(obj->i2c);
+    timeout = FLAG_I2C_TIMEOUT_BUSY;
+    while((i2c_flag_get(obj->i2c, I2C_FLAG_I2CBSY)) && (--timeout != 0));
+    if(0 == timeout) {
+        ret = I2C_BUSY;
+    }
+    /* generate a START condition */
+    i2c_start_on_bus(obj->i2c);
 
-        /* ensure the i2c has been started successfully */
-        timeout = FLAG_I2C_TIMEOUT_START;
-        while ((!i2c_flag_get(obj->i2c, I2C_FLAG_SBSEND)) && (--timeout != 0));
-        if (0 == timeout) {
-            ret = I2C_TIMEOUT;
-        }
+    /* ensure the i2c has been started successfully */
+    timeout = FLAG_I2C_TIMEOUT_START;
+    while((!i2c_flag_get(obj->i2c, I2C_FLAG_SBSEND)) && (--timeout != 0));
+    if(0 == timeout) {
+        ret = I2C_TIMEOUT;
+    }
 
-        /* send slave address */
-        i2c_master_addressing(obj->i2c, address, I2C_TRANSMITTER);
+    /* send slave address */
+    i2c_master_addressing(obj->i2c, address, I2C_TRANSMITTER);
 
-        /* wait until I2C_FLAG_ADDSEND flag is set */
-        timeout = FLAG_I2C_TIMEOUT_ADDR_NACK;
-        while ((!i2c_flag_get(obj->i2c, I2C_FLAG_ADDSEND)) && (--timeout != 0));
-        if (0 == timeout) {
-            ret = I2C_NACK_ADDR;
-        }
+    /* wait until I2C_FLAG_ADDSEND flag is set */
+    timeout = FLAG_I2C_TIMEOUT_ADDR_NACK;
+    while((!i2c_flag_get(obj->i2c, I2C_FLAG_ADDSEND)) && (--timeout != 0));
+    if(0 == timeout) {
+        ret = I2C_NACK_ADDR;
+    }
 
-        /* clear ADDSEND */
-        i2c_flag_clear(obj->i2c, I2C_FLAG_ADDSEND);
+    /* clear ADDSEND */
+    i2c_flag_clear(obj->i2c, I2C_FLAG_ADDSEND);
 
-        for (count = 0; count < length; count++) {
-            if (I2C_OK != i2c_byte_write(obj, data[count])) {
-                ret = I2C_NACK_DATA;
+    for(count = 0; count < length; count++) {
+        if(I2C_OK != i2c_byte_write(obj, data[count])) {
+            ret = I2C_NACK_DATA;
 		// TODO - break out of the loop
-            }
         }
-        /* if not sequential write, then send stop */
-        if (stop) {
-            i2c_stop(obj);
-        }
+    }
+    /* if not sequential write, then send stop */
+    if(stop) {
+        i2c_stop(obj);
+    }
     return ret;
 }
 
