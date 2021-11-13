@@ -460,6 +460,8 @@ i2c_status_enum i2c_wait_standby_state(i2c_t *obj, uint8_t address)
         i2c_flag_clear(obj->i2c, I2C_FLAG_AERR);
         status = I2C_NACK_ADDR;
     }
+
+    // On failure to send a stop, return the timeout
     if (i2c_stop(obj)) {
    	return I2C_TIMEOUT;
     }
