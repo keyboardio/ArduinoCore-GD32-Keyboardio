@@ -48,39 +48,19 @@ typedef enum {
 
 static struct i2c_s *obj_s_buf[I2C_NUM] = {NULL};
 
-/* If we set a 1ms timeout, we need to figure out how many clock
- * cycles that timeout is.
- * First, figure out how many cycles we expect to execute per ms
- * Then multiply by the number of ms we want the timeout to be
- *
- * At 120 MHz, a timeout of 0xF0000 results in an approximately 4s delay
- * That means that a timeout 0xFF gets us an 1ms delay
- *
- * To get to a 4s delay:
- * 	input 4000 ms
- * 	multiply by 120,000 cycles per ms
- * 	divide by 488 (the benchmarked speed of our timeouts)
- */
-
-// This number is the benchmarked time of one ms of I2C timeout on a
-// GD32F303 with GCC9.
-#define _I2C_TIMEOUT_FACTOR .0126
-#define _US_PER_SECOND 1000000
+#ifndef WIRE_I2C_FLAG_TIMEOUT
+#define WIRE_I2C_FLAG_TIMEOUT  (0xF0000U)
+#endif
 
 
-
-#define _I2C_TIMEOUT_IN_US(us) 0xF000U
-//#define _I2C_TIMEOUT_IN_US(us) (uint32_t)(((SystemCoreClock/_US_PER_SECOND)  * us) * _I2C_TIMEOUT_FACTOR )
-
-#define FLAG_I2C_TIMEOUT_BUSY  _I2C_TIMEOUT_IN_US(4000* 1000)
-
-#define FLAG_I2C_TIMEOUT_START  _I2C_TIMEOUT_IN_US(4000* 1000)
-#define FLAG_I2C_TIMEOUT_STOP _I2C_TIMEOUT_IN_US(4000* 1000)
-#define FLAG_I2C_TIMEOUT_STOP_BIT_RESET _I2C_TIMEOUT_IN_US(100)
-#define FLAG_I2C_TIMEOUT_ADDR_ACK _I2C_TIMEOUT_IN_US(100)
-#define FLAG_I2C_TIMEOUT_DATA_ACK _I2C_TIMEOUT_IN_US(100)
-#define FLAG_I2C_TIMEOUT_BYTE_TRANSMITTED _I2C_TIMEOUT_IN_US(100)
-#define FLAG_I2C_TIMEOUT_BYTE_RECEIVED  _I2C_TIMEOUT_IN_US(100)
+#define FLAG_I2C_TIMEOUT_BUSY WIRE_I2C_FLAG_TIMEOUT
+#define FLAG_I2C_TIMEOUT_START WIRE_I2C_FLAG_TIMEOUT
+#define FLAG_I2C_TIMEOUT_STOPI2C_TIMEOUT
+#define FLAG_I2C_TIMEOUT_STOP_BIT_RESET WIRE_I2C_FLAG_TIMEOUT
+#define FLAG_I2C_TIMEOUT_ADDR_ACK WIRE_I2C_FLAG_TIMEOUT
+#define FLAG_I2C_TIMEOUT_DATA_ACK WIRE_I2C_FLAG_TIMEOUT
+#define FLAG_I2C_TIMEOUT_BYTE_TRANSMITTED WIRE_I2C_FLAG_TIMEOUT
+#define FLAG_I2C_TIMEOUT_BYTE_RECEIVED WIRE_I2C_FLAG_TIMEOUT
 
 
 #define I2C_S(obj)    (struct i2c_s *) (obj)
