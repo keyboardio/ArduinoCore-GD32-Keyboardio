@@ -250,10 +250,6 @@ i2c_status_enum i2c_master_transmit(i2c_t *obj, uint8_t address, uint8_t *data, 
     }
 
     ret = _i2c_master_start(obj, address); 
-// // TODO
-// if (I2C_OK != ret ) {
-//       return ret;
-//   }
     if (I2C_OK == ret) {
     for (uint32_t count = 0; count < length; count++) {
         if (I2C_OK != i2c_byte_write(obj, data[count])) {
@@ -396,13 +392,8 @@ i2c_status_enum i2c_wait_standby_state(i2c_t *obj, uint8_t address)
 
 
     status = _i2c_master_start(obj, address);
-// TODO
-//    if (I2C_OK != status) {
-//        return status;
-//    }
 
-
-
+if (I2C_OK == status ) {
     timeout = FLAG_I2C_TIMEOUT_ADDR_ACK;
     /* keep looping till the address is acknowledged or the AERR flag is set (address not acknowledged at time) */
     do {
@@ -430,6 +421,8 @@ i2c_status_enum i2c_wait_standby_state(i2c_t *obj, uint8_t address)
         i2c_flag_clear(obj->i2c, I2C_FLAG_AERR);
         status = I2C_NACK_ADDR;
     }
+
+}
 
     // On failure to send a stop, return the timeout
     if (i2c_stop(obj) != I2C_OK) {
