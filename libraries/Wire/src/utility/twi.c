@@ -464,7 +464,7 @@ i2c_status_enum i2c_wait_standby_state(i2c_t *obj, uint8_t address)
     i2c_stop_on_bus(obj->i2c);
     timeout = FLAG_I2C_TIMEOUT_STOP;
     /* wait until the stop condition is finished */
-    while ((I2C_CTL0(obj->i2c) & 0x0200) && (--timeout != 0));
+    while ((I2C_CTL0(obj->i2c) & I2C_CTL0_STOP) && (--timeout != 0));
 
     if (0 == timeout) {
         status = I2C_TIMEOUT;
