@@ -527,7 +527,7 @@ i2c_status_enum _i2c_master_start(i2c_t *obj, uint8_t address)
     timeout = FLAG_I2C_TIMEOUT_ADDR_ACK;
     while ((!i2c_flag_get(obj->i2c, I2C_FLAG_ADDSEND)) && (--timeout != 0));
     if (0 == timeout) {
-        ret = I2C_NACK_ADDR;
+        ret = I2C_TIMEOUT;
     }
 
     /* clear ADDSEND */
