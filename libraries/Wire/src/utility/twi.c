@@ -49,28 +49,28 @@ typedef enum {
 static struct i2c_s *obj_s_buf[I2C_NUM] = {NULL};
 
 /* If we set a 1ms timeout, we need to figure out how many clock
- * cycles that timeout is. 
+ * cycles that timeout is.
  * First, figure out how many cycles we expect to execute per ms
  * Then multiply by the number of ms we want the timeout to be
  *
  * At 120 MHz, a timeout of 0xF0000 results in an approximately 4s delay
  * That means that a timeout 0xFF gets us an 1ms delay
- * 
+ *
  * To get to a 4s delay:
- * 	input 4000 ms 
- * 	multiply by 120,000 cycles per ms 
+ * 	input 4000 ms
+ * 	multiply by 120,000 cycles per ms
  * 	divide by 488 (the benchmarked speed of our timeouts)
  */
 
-// This number is the benchmarked time of one ms of I2C timeout on a 
-// GD32F303 with GCC9. 
+// This number is the benchmarked time of one ms of I2C timeout on a
+// GD32F303 with GCC9.
 #define _I2C_TIMEOUT_FACTOR .0126
 #define _US_PER_SECOND 1000000
 
 
 
-#define _I2C_TIMEOUT_IN_US(us) (uint32_t)(((SystemCoreClock/_US_PER_SECOND)  * us) * _I2C_TIMEOUT_FACTOR ) 
- 
+#define _I2C_TIMEOUT_IN_US(us) (uint32_t)(((SystemCoreClock/_US_PER_SECOND)  * us) * _I2C_TIMEOUT_FACTOR )
+
 #define FLAG_I2C_TIMEOUT_BUSY  _I2C_TIMEOUT_IN_US(4000* 1000)
 
 #define FLAG_I2C_TIMEOUT_START  _I2C_TIMEOUT_IN_US(4000* 1000)
@@ -115,21 +115,21 @@ void i2c_init(i2c_t *obj, PinName sda, PinName scl, uint8_t address)
     obj_s->scl = scl;
     obj_s->i2c = pinmap_merge(i2c_sda, i2c_scl);
 
-    switch (obj_s->i2c) {
-        case I2C0:
-            /* enable I2C0 clock and configure the pins of I2C0 */
-            obj_s->index = 0;
-            rcu_periph_clock_enable(RCU_I2C0);
+    switch(obj_s->i2c) {
+    case I2C0:
+        /* enable I2C0 clock and configure the pins of I2C0 */
+        obj_s->index = 0;
+        rcu_periph_clock_enable(RCU_I2C0);
 
-            break;
-        case I2C1:
-            /* enable I2C1 clock and configure the pins of I2C1 */
-            obj_s->index = 1;
-            rcu_periph_clock_enable(RCU_I2C1);
+        break;
+    case I2C1:
+        /* enable I2C1 clock and configure the pins of I2C1 */
+        obj_s->index = 1;
+        rcu_periph_clock_enable(RCU_I2C1);
 
-            break;
-        default:
-            break;
+        break;
+    default:
+        break;
     }
 
     /* configure the pins of I2C */
