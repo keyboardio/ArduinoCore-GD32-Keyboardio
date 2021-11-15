@@ -69,7 +69,8 @@ static struct i2c_s *obj_s_buf[I2C_NUM] = {NULL};
 
 
 
-#define _I2C_TIMEOUT_IN_US(us) (uint32_t)(((SystemCoreClock/_US_PER_SECOND)  * us) * _I2C_TIMEOUT_FACTOR )
+#define _I2C_TIMEOUT_IN_US(us) 0xF000U
+//#define _I2C_TIMEOUT_IN_US(us) (uint32_t)(((SystemCoreClock/_US_PER_SECOND)  * us) * _I2C_TIMEOUT_FACTOR )
 
 #define FLAG_I2C_TIMEOUT_BUSY  _I2C_TIMEOUT_IN_US(4000* 1000)
 
