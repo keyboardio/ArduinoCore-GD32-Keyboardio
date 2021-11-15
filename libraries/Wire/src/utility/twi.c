@@ -250,16 +250,16 @@ i2c_status_enum i2c_master_transmit(i2c_t *obj, uint8_t address, uint8_t *data, 
         return I2C_BUSY;
     }
 
-    ret = _i2c_master_start(obj, address); 
+    ret = _i2c_master_start(obj, address);
     if (I2C_OK == ret) {
-    for (uint32_t count = 0; count < length; count++) {
-        if (I2C_OK != i2c_byte_write(obj, data[count])) {
-		// If we didn't write the byte successfully, 
-		// we really don't want to keep trying to write subsequent
-		// bytes
-		break;
+        for (uint32_t count = 0; count < length; count++) {
+            if (I2C_OK != i2c_byte_write(obj, data[count])) {
+                // If we didn't write the byte successfully,
+                // we really don't want to keep trying to write subsequent
+                // bytes
+                break;
+            }
         }
-    }
     }
     /* if not sequential write, then send stop */
     if (stop) {
@@ -336,33 +336,33 @@ i2c_status_enum i2c_master_receive(i2c_t *obj, uint8_t address, uint8_t *data, u
 
     // TODO this needs docs
     if (I2C_OK == ret) {
-    for (count = 0; count < length; count++) {
-        if (length > 2 && count == (uint32_t)length - 3) {
-            timeout = FLAG_I2C_TIMEOUT_DATA_ACK;
+        for (count = 0; count < length; count++) {
+            if (length > 2 && count == (uint32_t)length - 3) {
+                timeout = FLAG_I2C_TIMEOUT_DATA_ACK;
 
-            while ((!i2c_flag_get(obj->i2c, I2C_FLAG_BTC)) && (--timeout != 0));
+                while ((!i2c_flag_get(obj->i2c, I2C_FLAG_BTC)) && (--timeout != 0));
 
-            if (0 == timeout) {
-                ret = I2C_NACK_DATA;
+                if (0 == timeout) {
+                    ret = I2C_NACK_DATA;
+                }
+
+                i2c_ack_config(obj->i2c, I2C_ACK_DISABLE);
+            } else if (2 == length && count == 0) {
+                timeout = FLAG_I2C_TIMEOUT_DATA_ACK;
+
+                while ((!i2c_flag_get(obj->i2c, I2C_FLAG_BTC)) && (--timeout != 0));
+
+                if (0 == timeout) {
+                    ret = I2C_NACK_DATA;
+                }
             }
 
-            i2c_ack_config(obj->i2c, I2C_ACK_DISABLE);
-        } else if (2 == length && count == 0) {
-            timeout = FLAG_I2C_TIMEOUT_DATA_ACK;
 
-            while ((!i2c_flag_get(obj->i2c, I2C_FLAG_BTC)) && (--timeout != 0));
-
-            if (0 == timeout) {
-                ret = I2C_NACK_DATA;
-            }
+            timeout = FLAG_I2C_TIMEOUT_BYTE_RECEIVED;
+            while ((!i2c_flag_get(obj->i2c, I2C_FLAG_RBNE)) && (--timeout != 0));
+            data[count] = i2c_data_receive(obj->i2c);
         }
-
-
-        timeout = FLAG_I2C_TIMEOUT_BYTE_RECEIVED;
-        while ((!i2c_flag_get(obj->i2c, I2C_FLAG_RBNE)) && (--timeout != 0));
-        data[count] = i2c_data_receive(obj->i2c);
     }
-}
     /* if not sequential read, then send stop */
     if (stop) {
         i2c_stop(obj);
@@ -390,36 +390,36 @@ i2c_status_enum i2c_wait_standby_state(i2c_t *obj, uint8_t address)
 
     status = _i2c_master_start(obj, address);
 
-if (I2C_OK == status ) {
-    timeout = FLAG_I2C_TIMEOUT_ADDR_ACK;
-    /* keep looping till the address is acknowledged or the AERR flag is set (address not acknowledged at time) */
-    do {
-        /* get the current value of the I2C_STAT0 register */
-        val = I2C_STAT0(obj->i2c);
+    if (I2C_OK == status) {
+        timeout = FLAG_I2C_TIMEOUT_ADDR_ACK;
+        /* keep looping till the address is acknowledged or the AERR flag is set (address not acknowledged at time) */
+        do {
+            /* get the current value of the I2C_STAT0 register */
+            val = I2C_STAT0(obj->i2c);
 
-    } while ((0 == (val & (I2C_STAT0_ADDSEND | I2C_STAT0_AERR))) && (--timeout != 0));
+        } while ((0 == (val & (I2C_STAT0_ADDSEND | I2C_STAT0_AERR))) && (--timeout != 0));
 
-    /* check if the ADDSEND flag has been set */
-    if (0 == timeout) {
-        status = I2C_TIMEOUT;
-    } else if (val & I2C_STAT0_ADDSEND) {
+        /* check if the ADDSEND flag has been set */
+        if (0 == timeout) {
+            status = I2C_TIMEOUT;
+        } else if (val & I2C_STAT0_ADDSEND) {
 
-        /* clear ADDSEND flag */
-        i2c_flag_clear(obj->i2c, I2C_FLAG_ADDSEND);
+            /* clear ADDSEND flag */
+            i2c_flag_clear(obj->i2c, I2C_FLAG_ADDSEND);
 
-        /* send a stop condition to I2C bus */
-        i2c_stop_on_bus(obj->i2c);
+            /* send a stop condition to I2C bus */
+            i2c_stop_on_bus(obj->i2c);
 
-        /* exit the function */
-        status = I2C_OK;
+            /* exit the function */
+            status = I2C_OK;
 
-    } else {
-        /* clear the bit of AERR */
-        i2c_flag_clear(obj->i2c, I2C_FLAG_AERR);
-        status = I2C_NACK_ADDR;
+        } else {
+            /* clear the bit of AERR */
+            i2c_flag_clear(obj->i2c, I2C_FLAG_AERR);
+            status = I2C_NACK_ADDR;
+        }
+
     }
-
-}
 
     // On failure to send a stop, return the timeout
     if (i2c_stop(obj) != I2C_OK) {
