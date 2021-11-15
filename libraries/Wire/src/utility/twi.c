@@ -332,13 +332,9 @@ i2c_status_enum i2c_master_receive(i2c_t *obj, uint8_t address, uint8_t *data, u
     }
 
     ret = _i2c_master_start(obj, address);
-// TODO
-//
-// if (I2C_OK != ret ) {
-//        return ret;
-//    }
 
     // TODO this needs docs
+    if (I2C_OK == ret) {
     for (count = 0; count < length; count++) {
         if (length > 2 && count == (uint32_t)length - 3) {
             timeout = FLAG_I2C_TIMEOUT_DATA_ACK;
@@ -365,7 +361,7 @@ i2c_status_enum i2c_master_receive(i2c_t *obj, uint8_t address, uint8_t *data, u
         while ((!i2c_flag_get(obj->i2c, I2C_FLAG_RBNE)) && (--timeout != 0));
         data[count] = i2c_data_receive(obj->i2c);
     }
-
+}
     /* if not sequential read, then send stop */
     if (stop) {
         i2c_stop(obj);
