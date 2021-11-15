@@ -254,7 +254,7 @@ i2c_status_enum i2c_master_transmit(i2c_t *obj, uint8_t address, uint8_t *data, 
 // if (I2C_OK != ret ) {
 //       return ret;
 //   }
-
+    if (I2C_OK == ret) {
     for (uint32_t count = 0; count < length; count++) {
         if (I2C_OK != i2c_byte_write(obj, data[count])) {
 		// If we didn't write the byte successfully, 
@@ -262,6 +262,7 @@ i2c_status_enum i2c_master_transmit(i2c_t *obj, uint8_t address, uint8_t *data, 
 		// bytes
 		break;
         }
+    }
     }
     /* if not sequential write, then send stop */
     if (stop) {
