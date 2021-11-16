@@ -57,16 +57,17 @@ private:
     uint32_t wfwcCount = 0;
 };
 
+template<size_t L, size_t C>
 class EPBuffers_ {
 public:
-    EPBuffer<USBD_EP0_MAX_SIZE>& buf(uint8_t ep);
+    EPBuffer<L>& buf(uint8_t ep);
     void markComplete(uint8_t ep);
 
 private:
-    EPBuffer<USBD_EP0_MAX_SIZE> epBufs[EP_COUNT];
+    EPBuffer<L> epBufs[C];
 };
 
-EPBuffers_& EPBuffers();
+EPBuffers_<USBD_EP0_MAX_SIZE, EP_COUNT>& EPBuffers();
 
 class USBCore_ {
 public:
