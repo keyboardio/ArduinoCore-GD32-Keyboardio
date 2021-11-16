@@ -294,16 +294,18 @@ void EPBuffer<L>::waitForWriteComplete()
     }
 }
 
-EPBuffer<USBD_EP0_MAX_SIZE>& EPBuffers_::buf(uint8_t ep) {
+template<size_t L, size_t C>
+EPBuffer<L>& EPBuffers_<L, C>::buf(uint8_t ep) {
     return this->epBufs[ep];
 }
 
-void EPBuffers_::markComplete(uint8_t ep) {
+template<size_t L, size_t C>
+void EPBuffers_<L, C>::markComplete(uint8_t ep) {
     this->buf(ep).markComplete();
 }
 
-EPBuffers_& EPBuffers() {
-    static EPBuffers_ obj;
+EPBuffers_<USBD_EP0_MAX_SIZE, EP_COUNT>& EPBuffers() {
+    static EPBuffers_<USBD_EP0_MAX_SIZE, EP_COUNT> obj;
     return obj;
 }
 
