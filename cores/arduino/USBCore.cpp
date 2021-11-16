@@ -153,7 +153,9 @@ static uint8_t class_core_req_process(usb_dev* usbd, usb_req* req)
             return REQ_NOTSUPP;
         }
     } else {
-        PluggableUSB().setup(setup);
+        if (!PluggableUSB().setup(setup)) {
+            return REQ_NOTSUPP;
+        }
     }
 
     return REQ_SUPP;
