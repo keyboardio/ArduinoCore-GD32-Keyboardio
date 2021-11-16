@@ -19,6 +19,29 @@ extern "C" {
  * they need to be converted.
  */
 
+
+// If the device hasn't defined a USB VID / PID pair, use a generic
+// VID/PID provided by Keyboardio as a fallback.
+// TODO - transition to a pid.codes VID/PID pair
+
+#ifndef USB_VID
+#define USB_VID 0x3496
+#endif
+
+#ifndef USB_PID
+#define USB_PID 0xf000
+#endif
+
+#ifndef USB_MANUFACTURER
+#define USB_MANUFACTURER "Unknown"
+#endif
+
+#ifndef USB_DEVICE
+#define USB_DEVICE "Unspecified device"
+#endif
+
+
+
 #define STR_IDX_LANGID 0
 #define STR_IDX_MFC 1
 #define STR_IDX_PRODUCT 2
@@ -29,6 +52,7 @@ extern "C" {
 #ifndef USB_CONFIG_POWER
 #define USB_CONFIG_POWER                      (500)
 #endif
+
 
 // TODO: make the device descriptor a member variable which can be
 // overridden by subclasses.
