@@ -65,7 +65,19 @@ usb_desc_config configDesc = {
     .bNumInterfaces = 0,
     .bConfigurationValue = 1,
     .iConfiguration = 0,
+#ifdef USBD_SELF_POWERED
+#ifdef USBD_REMOTE_WAKEUP
+    .bmAttributes = 0b11100000,
+#else
+    .bmAttributes = 0b11000000,
+#endif // USBD_REMOTE_WAKEUP
+#else
+#ifdef USBD_REMOTE_WAKEUP
+    .bmAttributes = 0b10100000,
+#else
     .bmAttributes = 0b10000000,
+#endif // USBD_REMOTE_WAKEUP
+#endif // USBD_SELF_POWERED
     .bMaxPower = USB_CONFIG_POWER_MA(USB_CONFIG_POWER)
 };
 
