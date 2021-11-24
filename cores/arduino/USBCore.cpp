@@ -12,13 +12,11 @@ extern "C" {
 #include <cassert>
 
 /*
- * #defines from Arduino:
- *   USB_MANUFACTURER
- *   USB_PRODUCT
- * These are both C-strings, not utf16, which is needed by USB; so
- * they need to be converted.
+ * DO NOT CHANGE THESE VALUES.
+ *
+ * They are also used by the firmware library’s internal
+ * functions. Changing them here may cause that to break.
  */
-
 #define STR_IDX_LANGID 0
 #define STR_IDX_MFC 1
 #define STR_IDX_PRODUCT 2
