@@ -85,7 +85,18 @@ public:
     int recv(uint8_t ep);
     int flush(uint8_t ep);
 
-    //private:
+    /*
+     * Static member function helpers called from ISR.
+     *
+     * These pull the core handle from ‘usbd’ and use it to call the
+     * instance member functions.
+     */
+    static void transcSetupHelper(usb_dev* usbd, uint8_t ep);
+    static void transcOutHelper(usb_dev* usbd, uint8_t ep);
+    static void transcInHelper(usb_dev* usbd, uint8_t ep);
+    static void transcUnknownHelper(usb_dev* usbd, uint8_t ep);
+
+private:
     // TODO: verify that this only applies to the control endpoint’s use of wLength
     // I think this is only on the setup packet, so it should be fine.
     uint16_t maxWrite = 0;
@@ -97,17 +108,6 @@ public:
     void (*oldTranscOut)(usb_dev* usbd, uint8_t ep);
     void (*oldTranscIn)(usb_dev* usbd, uint8_t ep);
     void (*oldTranscUnknown)(usb_dev* usbd, uint8_t ep);
-
-    /*
-     * Static member function helpers called from ISR.
-     *
-     * These pull the core handle from ‘usbd’ and use it to call the
-     * instance member functions.
-     */
-    static void transcSetupHelper(usb_dev* usbd, uint8_t ep);
-    static void transcOutHelper(usb_dev* usbd, uint8_t ep);
-    static void transcInHelper(usb_dev* usbd, uint8_t ep);
-    static void transcUnknownHelper(usb_dev* usbd, uint8_t ep);
 
     void transcSetup(usb_dev* usbd, uint8_t ep);
     void transcOut(usb_dev* usbd, uint8_t ep);
