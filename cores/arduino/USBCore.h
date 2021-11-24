@@ -75,6 +75,9 @@ public:
 
     void connect();
 
+    /*
+     * PluggableUSB interface.
+     */
     int sendControl(uint8_t flags, const void* data, int len);
     int recvControl(void* d, int len);
     int recvControlLong(void* d, int len);
