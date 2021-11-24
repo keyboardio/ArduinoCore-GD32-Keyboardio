@@ -106,113 +106,6 @@ usb_desc desc = {
     .strings     = stringDescs
 };
 
-static uint8_t class_core_init(usb_dev* usbd, uint8_t config_index)
-{
-    (void)config_index;
-
-    /*
-     * Endpoint 0 is configured during startup, so skip it and only
-     * handle what’s configured by ‘PluggableUSB’.
-     */
-    uint32_t buf_offset = EP0_RX_ADDR + USBD_EP0_MAX_SIZE;
-    for (uint8_t ep = 1; ep < PluggableUSB().epCount(); ep++) {
-        uint16_t epBufferInfo = *(uint16_t*)epBuffer(ep);
-        usb_desc_ep ep_desc = {
-            .header = {
-                .bLength = sizeof(ep_desc),
-                .bDescriptorType = USB_DESCTYPE_EP,
-            },
-            .bEndpointAddress = (uint8_t)(EPTYPE_DIR(epBufferInfo) | ep),
-            .bmAttributes = EPTYPE_TYPE(epBufferInfo),
-            .wMaxPacketSize = USBD_EP0_MAX_SIZE,
-            .bInterval = 0
-        };
-        // Don’t overflow the hardware buffer table.
-        assert((buf_offset + ep_desc.wMaxPacketSize) < 0x6000);
-
-        usbd->ep_transc[ep][TRANSC_IN] = USBCore_::transcInHelper;
-        usbd->ep_transc[ep][TRANSC_OUT] = USBCore_::transcOutHelper;
-        usbd->drv_handler->ep_setup(usbd, EP_BUF_SNG, buf_offset, &ep_desc);
-        buf_offset += ep_desc.wMaxPacketSize;
-    }
-    return USBD_OK;
-}
-
-static uint8_t class_core_deinit(usb_dev* usbd, uint8_t config_index)
-{
-    // TODO: Called when SetConfiguration setup packet sets the configuration
-    // to 0.
-    (void)usbd;
-    (void)config_index;
-    return USBD_OK;
-}
-
-// Called when ep0 gets a SETUP packet after configuration.
-static uint8_t class_core_req_process(usb_dev* usbd, usb_req* req)
-{
-    (void)usbd;
-
-    // TODO: remove this copy.
-    arduino::USBSetup setup;
-    memcpy(&setup, req, sizeof(setup));
-    if (setup.bRequest == USB_GET_DESCRIPTOR) {
-        auto sent = PluggableUSB().getDescriptor(setup);
-        if (sent > 0) {
-            USBCore().flush(0);
-        } else if (sent < 0) {
-            return REQ_NOTSUPP;
-        }
-    } else {
-        if (!PluggableUSB().setup(setup)) {
-            return REQ_NOTSUPP;
-        }
-    }
-
-    return REQ_SUPP;
-}
-
-// Called when ep0 is done sending all data from an IN stage.
-static uint8_t class_core_ctlx_in(usb_dev* usbd)
-{
-    (void)usbd;
-    return REQ_SUPP;
-}
-
-// Called when ep0 is done receiving all data from an OUT stage.
-static uint8_t class_core_ctlx_out(usb_dev* usbd)
-{
-    (void)usbd;
-    return REQ_SUPP;
-}
-
-// Appears to be unused in usbd library, but used in usbfs.
-static void class_core_data_in(usb_dev* usbd, uint8_t ep)
-{
-    (void)usbd;
-    (void)ep;
-    return;
-}
-
-// Appears to be unused in usbd library, but used in usbfs.
-static void class_core_data_out(usb_dev* usbd, uint8_t ep)
-{
-    (void)usbd;
-    (void)ep;
-    return;
-}
-
-usb_class class_core = {
-    .req_cmd	= 0xff,
-    .req_altset   = 0x0,
-    .init		= class_core_init,
-    .deinit	= class_core_deinit,
-    .req_process	= class_core_req_process,
-    .ctlx_in	= class_core_ctlx_in,
-    .ctlx_out	= class_core_ctlx_out,
-    .data_in	= class_core_data_in,
-    .data_out	= class_core_data_out,
-};
-
 template<size_t L>
 size_t EPBuffer<L>::push(const void *d, size_t len)
 {
@@ -297,31 +190,138 @@ void EPBuffer<L>::waitForWriteComplete()
             && (USBD_EPxCS(ep_num) & EPxCS_TX_ST) == EPxCS_TX_ST) {
             USBD_EP_TX_ST_CLEAR(ep_num);
             EPBuffers().markComplete(ep_num);
-        } else if (int_status & INTF_ERRIF) {
-            // XXX: figure out why this is happening for endpoint 2+
-            CLR(ERRIF);
         }
     }
 }
 
 template<size_t L, size_t C>
-EPBuffer<L>& EPBuffers_<L, C>::buf(uint8_t ep) {
+EPBuffer<L>& EPBuffers_<L, C>::buf(uint8_t ep)
+{
     return this->epBufs[ep];
 }
 
 template<size_t L, size_t C>
-void EPBuffers_<L, C>::markComplete(uint8_t ep) {
+void EPBuffers_<L, C>::markComplete(uint8_t ep)
+{
     this->buf(ep).markComplete();
 }
 
-EPBuffers_<USBD_EP0_MAX_SIZE, EP_COUNT>& EPBuffers() {
+EPBuffers_<USBD_EP0_MAX_SIZE, EP_COUNT>& EPBuffers()
+{
     static EPBuffers_<USBD_EP0_MAX_SIZE, EP_COUNT> obj;
     return obj;
 }
 
+class ClassCore {
+public:
+    static usb_class *structPtr() {
+        static usb_class rc = {
+            .req_cmd     = 0xff,
+            .req_altset  = 0x0,
+            .init        = ClassCore::init,
+            .deinit      = ClassCore::deinit,
+            .req_process = ClassCore::reqProcess,
+            .ctlx_in     = ClassCore::ctlIn,
+            .ctlx_out    = ClassCore::ctlOut,
+            .data_in     = ClassCore::dataIn,
+            .data_out    = ClassCore::dataOut
+        };
+        return &rc;
+    }
+
+    // Called after device configuration is set.
+    static uint8_t init(usb_dev* usbd, uint8_t config_index) {
+        (void)config_index;
+
+        /*
+         * Endpoint 0 is configured during startup, so skip it and only
+         * handle what’s configured by ‘PluggableUSB’.
+         */
+        uint32_t buf_offset = EP0_RX_ADDR + USBD_EP0_MAX_SIZE;
+        for (uint8_t ep = 1; ep < PluggableUSB().epCount(); ep++) {
+            uint16_t epBufferInfo = *(uint16_t*)epBuffer(ep);
+            usb_desc_ep ep_desc = {
+                .header = {
+                    .bLength = sizeof(ep_desc),
+                    .bDescriptorType = USB_DESCTYPE_EP,
+                },
+                .bEndpointAddress = (uint8_t)(EPTYPE_DIR(epBufferInfo) | ep),
+                .bmAttributes = EPTYPE_TYPE(epBufferInfo),
+                .wMaxPacketSize = USBD_EP0_MAX_SIZE,
+                .bInterval = 0
+            };
+            // Don’t overflow the hardware buffer table.
+            assert((buf_offset + ep_desc.wMaxPacketSize) < 0x6000);
+
+            usbd->ep_transc[ep][TRANSC_IN] = USBCore_::transcInHelper;
+            usbd->ep_transc[ep][TRANSC_OUT] = USBCore_::transcOutHelper;
+            usbd->drv_handler->ep_setup(usbd, EP_BUF_SNG, buf_offset, &ep_desc);
+            buf_offset += ep_desc.wMaxPacketSize;
+        }
+        return USBD_OK;
+    }
+
+    // Called when SetConfiguration setup packet sets the
+    // configuration to 0.
+    static uint8_t deinit(usb_dev* usbd, uint8_t config_index) {
+        (void)usbd;
+        (void)config_index;
+        return USBD_OK;
+    }
+
+    // Called when ep0 gets a SETUP packet after configuration.
+    static uint8_t reqProcess(usb_dev* usbd, usb_req* req) {
+        (void)usbd;
+
+        // TODO: remove this copy.
+        arduino::USBSetup setup;
+        memcpy(&setup, req, sizeof(setup));
+        if (setup.bRequest == USB_GET_DESCRIPTOR) {
+            auto sent = PluggableUSB().getDescriptor(setup);
+            if (sent > 0) {
+                USBCore().flush(0);
+            } else if (sent < 0) {
+                return REQ_NOTSUPP;
+            }
+        } else {
+            if (!PluggableUSB().setup(setup)) {
+                return REQ_NOTSUPP;
+            }
+        }
+
+        return REQ_SUPP;
+    }
+
+    // Called when ep0 is done sending all data from an IN stage.
+    static uint8_t ctlIn(usb_dev* usbd) {
+        (void)usbd;
+        return REQ_SUPP;
+    }
+
+    // Called when ep0 is done receiving all data from an OUT stage.
+    static uint8_t ctlOut(usb_dev* usbd) {
+        (void)usbd;
+        return REQ_SUPP;
+    }
+
+    // Appears to be unused in usbd library, but used in usbfs.
+    static void dataIn(usb_dev* usbd, uint8_t ep) {
+        (void)usbd;
+        (void)ep;
+        return;
+    }
+
+    // Appears to be unused in usbd library, but used in usbfs.
+    static void dataOut(usb_dev* usbd, uint8_t ep) {
+        (void)usbd;
+        (void)ep;
+        return;
+    }
+};
+
 USBCore_::USBCore_()
 {
-    usb_init(&desc, &class_core);
+    usb_init(&desc, ClassCore::structPtr());
     usbd.user_data = this;
 
     this->oldTranscSetup = usbd.ep_transc[0][TRANSC_SETUP];
@@ -533,7 +533,7 @@ void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep)
             return;
         } else if ((usbd->control.req.bmRequestType & USB_RECPTYPE_MASK) == USB_RECPTYPE_ITF) {
             Serial.println("itfdesc");
-            class_core_req_process(usbd, &usbd->control.req);
+            ClassCore::reqProcess(usbd, &usbd->control.req);
             return;
         } else {
             Serial.println("stddesc");
