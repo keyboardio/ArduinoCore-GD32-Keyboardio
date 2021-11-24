@@ -1,5 +1,7 @@
 #include "usb.h"
 
+#include "usbd_lld_int.h"
+
 usb_dev usbd;
 
 static void rcu_config()
