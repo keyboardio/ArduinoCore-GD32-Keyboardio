@@ -137,7 +137,6 @@ template<size_t L>
 void EPBuffer<L>::flush(uint8_t ep)
 {
     this->flCount++;
-    Serial.print("f");
 
     // Busy loop until the previous IN transaction completes.
     this->waitForWriteComplete();
@@ -151,7 +150,6 @@ template<size_t L>
 void EPBuffer<L>::markComplete()
 {
     this->mcCount++;
-    Serial.println("c");
     this->txWaiting = false;
 }
 
@@ -339,8 +337,6 @@ USBCore_::USBCore_()
 
 void USBCore_::connect()
 {
-    Serial.begin(115200);
-    Serial.println("connect");
     usb_connect();
 }
 
@@ -502,19 +498,16 @@ void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep)
 {
     (void)ep;
 
-    Serial.print("S");
     usb_reqsta reqstat = REQ_NOTSUPP;
 
     uint16_t count = usbd->drv_handler->ep_read((uint8_t *)(&usbd->control.req), 0, (uint8_t)EP_BUF_SNG);
 
     if (count != USB_SETUP_PACKET_LEN) {
-        Serial.print("!");
         usbd_ep_stall(usbd, 0);
 
         return;
     }
 
-    Serial.print(".");
     this->maxWrite = usbd->control.req.wLength;
     switch (usbd->control.req.bmRequestType & USB_REQTYPE_MASK) {
         /* standard device request */
@@ -522,21 +515,17 @@ void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep)
         if (usbd->control.req.bRequest == USB_GET_DESCRIPTOR
             && (usbd->control.req.bmRequestType & USB_RECPTYPE_MASK) == USB_RECPTYPE_DEV
             && (usbd->control.req.wValue >> 8) == USB_DESCTYPE_CONFIG) {
-            Serial.println("confdesc");
             this->sendDeviceConfigDescriptor();
             return;
         } else if (usbd->control.req.bRequest == USB_GET_DESCRIPTOR
                    && (usbd->control.req.bmRequestType & USB_RECPTYPE_MASK) == USB_RECPTYPE_DEV
                    && (usbd->control.req.wValue >> 8) == USB_DESCTYPE_STR) {
-            Serial.println("strdesc");
             this->sendDeviceStringDescriptor();
             return;
         } else if ((usbd->control.req.bmRequestType & USB_RECPTYPE_MASK) == USB_RECPTYPE_ITF) {
-            Serial.println("itfdesc");
             ClassCore::reqProcess(usbd, &usbd->control.req);
             return;
         } else {
-            Serial.println("stddesc");
             reqstat = usbd_standard_request(usbd, &usbd->control.req);
         }
         break;
@@ -544,14 +533,12 @@ void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep)
         /* device class request */
     case USB_REQTYPE_CLASS:
         // Calls into class_core->req_process, does nothing else.
-        Serial.println("classdesc");
         reqstat = usbd_class_request(usbd, &usbd->control.req);
         break;
 
         /* vendor defined request */
     case USB_REQTYPE_VENDOR:
         // Does nothing.
-        Serial.println("vendordesc");
         reqstat = usbd_vendor_request(usbd, &usbd->control.req);
         break;
 
