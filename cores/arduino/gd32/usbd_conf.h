@@ -34,7 +34,7 @@
  * Offset from USBD RAM base used to store endpoint buffer
  * descriptors.
  *
- * cf. GD32F30x User Manual §26.6.1.
+ * cf. GD32F30x User Manual §24.6.1.
  */
 #define BTABLE_OFFSET 0
 
