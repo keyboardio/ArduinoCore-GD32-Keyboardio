@@ -41,5 +41,5 @@ serial:
 	ssh -t raichu screen $(SERIAL) 115200
 
 etags:
-	cd ../.. && find . -name '*.[ch]' -o -name '*.cpp' -o -name '*.ino' -print | grep -v usbfs | etags -
+	cd ../.. && find . -name '*.[ch]' -o \( -name '*.cpp' -o -name '*.ino' \) -print | grep -v usbfs | etags -
 
