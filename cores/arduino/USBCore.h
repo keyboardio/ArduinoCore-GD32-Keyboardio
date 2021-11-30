@@ -1,6 +1,8 @@
 #pragma once
 
-#include "api/PluggableUSB.h"
+#include "Arduino.h"
+#include "USBDefs.h"
+
 extern "C" {
 #include "usbd_core.h"
 #include "usb_ch9_std.h"
@@ -34,10 +36,13 @@ template<size_t L>
 class EPBuffer {
 public:
     size_t push(const void* d, size_t len);
+    size_t pop(void* d, size_t len);
     void reset();
     size_t len();
-    size_t remaining();
+    size_t available();
+    size_t sendSpace();
     void flush(uint8_t ep);
+    void fetch(uint8_t ep);
     void markComplete();
 
 private:
@@ -45,7 +50,7 @@ private:
     void waitForWriteComplete();
 
     uint8_t buf[L];
-    uint8_t* tail = buf + sizeof(buf);
+    uint8_t* tail = buf;
     uint8_t* p = buf;
 
     // TODO: this should probably be explicitly atomic.
@@ -79,8 +84,8 @@ public:
      * PluggableUSB interface.
      */
     int sendControl(uint8_t flags, const void* data, int len);
-    int recvControl(void* d, int len);
-    int recvControlLong(void* d, int len);
+    int recvControl(void* data, int len);
+    int recvControlLong(void* data, int len);
     uint8_t available(uint8_t ep);
     uint8_t sendSpace(uint8_t ep);
     int send(uint8_t ep, const void* data, int len);

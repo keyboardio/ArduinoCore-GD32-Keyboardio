@@ -2,10 +2,19 @@
 
 void setup()
 {
+    pinMode(LED2, OUTPUT);
+
     Serial1.begin(115200);
     Serial1.println("-- Blink demo --");
 
-    pinMode(LED2, OUTPUT);
+    while (!Serial) {
+        digitalWrite(LED2, HIGH);
+        delay(100);
+        digitalWrite(LED2, LOW);
+        delay(100);
+    };
+
+    Serial.println("cdc acm");
 
     BootKeyboard.begin();
     Mouse.begin();
@@ -17,6 +26,10 @@ void loop()
     digitalWrite(LED2, HIGH);
     delay(500);
 
+    Serial.print(".");
+    /* auto c = Serial.read(); */
+    /* Serial1.print("c: "); */
+    /* Serial1.println((char)c); */
     BootKeyboard.press(HID_KEYBOARD_A_AND_A);
     BootKeyboard.sendReport();
     BootKeyboard.releaseAll();

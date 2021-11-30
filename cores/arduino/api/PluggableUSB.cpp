@@ -19,7 +19,7 @@
 
 #include "PluggableUSB.h"
 
-#include "usbd_conf.h"
+#include "USBCore.h"
 
 using namespace arduino;
 
@@ -112,7 +112,10 @@ uint8_t PluggableUSB_::epCount() {
 
 PluggableUSB_& PluggableUSB()
 {
-  // Start after the control endpoint.
+#ifdef USE_CDC_SERIAL
+  static PluggableUSB_ obj(2, 4);
+#else
   static PluggableUSB_ obj(0, 1);
+#endif
   return obj;
 }

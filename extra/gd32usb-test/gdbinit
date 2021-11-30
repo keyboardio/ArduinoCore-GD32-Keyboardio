@@ -8,4 +8,4 @@ set print asm-demangle on
 # OpenOCD
 set remote hardware-breakpoint-limit 4
 set remote hardware-watchpoint-limit 2
-target extended-remote raichu:3333
+target extended-remote :3333
