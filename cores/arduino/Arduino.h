@@ -51,7 +51,6 @@ extern "C" {
 #include "gd32/gpio_interrupt.h"
 #include "gd32/timer.h"
 #include "gd32/rtc.h"
-#include "gd32/usb.h"
 
 #ifdef __cplusplus
 }
@@ -72,8 +71,13 @@ extern "C" {
 }
 #endif // __cplusplus
 
+// TODO: move this to variant.h or some similar place.
+#define USE_CDC_SERIAL
+//#undef USE_CDC_SERIAL
+
 #include "variant.h"
 #include "HardwareSerial.h"
+#include "CDCACM.h"
 
 #endif
 #endif

@@ -29,7 +29,11 @@ foo:
 	arduino-cli compile $(COMPILE_FLAGS) --upload --verify gd32usb-test.ino.elf
 
 openocd:
-	ssh raichu openocd -f openocd/listen-any.cfg -f interface/cmsis-dap.cfg -f target/stm32f3x.cfg
+	openocd -f interface/cmsis-dap.cfg -f target/stm32f3x.cfg
+#	ssh -t raichu openocd -f openocd/listen-any.cfg -f interface/cmsis-dap.cfg -f target/stm32f3x.cfg
+
+pyocd:
+	ssh -t raichu pyocd gdbserver --allow-remote # --target stm32f303cc
 
 gdb: build
 	$(GCC_PREFIX)/bin/arm-none-eabi-gdb -x gdbinit build/gd32usb-test.ino.elf
@@ -37,8 +41,8 @@ gdb: build
 serial:
 #	$(SU) stty -F $(SERIAL) min 100 time 2 hupcl -brkint -ignpar icrnl opost onlcr isig icanon echo 115200
 #	$(SU) cat $(SERIAL)
-#	$(SU) screen $(SERIAL) 115200
-	ssh -t raichu screen $(SERIAL) 115200
+	$(SU) screen $(SERIAL) 115200
+#	ssh -t raichu screen $(SERIAL) 115200
 
 etags:
 	cd ../.. && find . -name '*.[ch]' -o \( -name '*.cpp' -o -name '*.ino' \) -print | grep -v usbfs | etags -

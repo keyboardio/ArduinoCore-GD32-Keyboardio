@@ -1,7 +1,5 @@
 #include "USBCore.h"
 
-#include "Arduino.h"
-
 extern "C" {
 #include "gd32/usb.h"
 #include "usbd_enum.h"
@@ -41,7 +39,7 @@ static usb_desc_dev devDesc = {
     .bDeviceProtocol       = 0x00,
     // TODO: this depends on what the mcu can support, but this is
     // device dependent code, so nevermind?
-    .bMaxPacketSize0       = USBD_EP0_MAX_SIZE,
+    .bMaxPacketSize0       = USB_EP_SIZE,
     .idVendor              = USB_VID,
     .idProduct             = USB_PID,
     .bcdDevice             = 0x0100,
@@ -49,8 +47,6 @@ static usb_desc_dev devDesc = {
     .iManufacturer         = STR_IDX_MFC,
     .iProduct              = STR_IDX_PRODUCT,
     .iSerialNumber         = STR_IDX_SERIAL,
-    // TODO: for PluggableUSB, should probably be 1. Configured in
-    // usbd_conf.h
     .bNumberConfigurations = 1
 };
 
@@ -109,16 +105,26 @@ usb_desc desc = {
 template<size_t L>
 size_t EPBuffer<L>::push(const void *d, size_t len)
 {
-    size_t w = min(this->remaining(), len);
+    size_t w = min(this->sendSpace(), len);
     memcpy(this->p, d, w);
     this->p += w;
     return w;
 }
 
 template<size_t L>
+size_t EPBuffer<L>::pop(void* d, size_t len)
+{
+    size_t r = min(this->available(), len);
+    memcpy(d, this->p, r);
+    this->p += r;
+    return r;
+}
+
+template<size_t L>
 void EPBuffer<L>::reset()
 {
     this->p = this->buf;
+    this->tail = this->buf;
 }
 
 template<size_t L>
@@ -128,9 +134,15 @@ size_t EPBuffer<L>::len()
 }
 
 template<size_t L>
-size_t EPBuffer<L>::remaining()
+size_t EPBuffer<L>::available()
 {
     return this->tail - this->p;
+}
+
+template<size_t L>
+size_t EPBuffer<L>::sendSpace()
+{
+    return L - this->len();
 }
 
 template<size_t L>
@@ -144,6 +156,20 @@ void EPBuffer<L>::flush(uint8_t ep)
     this->txWaiting = true;
     usbd.drv_handler->ep_write(this->buf, ep, this->len());
     this->reset();
+}
+
+template<size_t L>
+void EPBuffer<L>::fetch(uint8_t ep)
+{
+    this->reset();
+
+    // Turn on reception and busy loop until we get an OUT packet.
+    this->txWaiting = true;
+    usbd.drv_handler->ep_rx_enable(&usbd, ep);
+    this->waitForDataReady();
+
+    auto read = usbd.drv_handler->ep_read(this->buf, ep, EP_BUF_SNG);
+    this->tail = this->buf + read;
 }
 
 template<size_t L>
@@ -204,9 +230,9 @@ void EPBuffers_<L, C>::markComplete(uint8_t ep)
     this->buf(ep).markComplete();
 }
 
-EPBuffers_<USBD_EP0_MAX_SIZE, EP_COUNT>& EPBuffers()
+EPBuffers_<USB_EP_SIZE, EP_COUNT>& EPBuffers()
 {
-    static EPBuffers_<USBD_EP0_MAX_SIZE, EP_COUNT> obj;
+    static EPBuffers_<USB_EP_SIZE, EP_COUNT> obj;
     return obj;
 }
 
@@ -235,7 +261,7 @@ public:
          * Endpoint 0 is configured during startup, so skip it and only
          * handle what’s configured by ‘PluggableUSB’.
          */
-        uint32_t buf_offset = EP0_RX_ADDR + USBD_EP0_MAX_SIZE;
+        uint32_t buf_offset = EP0_RX_ADDR + USB_EP_SIZE;
         for (uint8_t ep = 1; ep < PluggableUSB().epCount(); ep++) {
             uint16_t epBufferInfo = *(uint16_t*)epBuffer(ep);
             usb_desc_ep ep_desc = {
@@ -245,11 +271,11 @@ public:
                 },
                 .bEndpointAddress = (uint8_t)(EPTYPE_DIR(epBufferInfo) | ep),
                 .bmAttributes = EPTYPE_TYPE(epBufferInfo),
-                .wMaxPacketSize = USBD_EP0_MAX_SIZE,
+                .wMaxPacketSize = USB_EP_SIZE,
                 .bInterval = 0
             };
             // Don’t overflow the hardware buffer table.
-            assert((buf_offset + ep_desc.wMaxPacketSize) < 0x6000);
+            assert((buf_offset + ep_desc.wMaxPacketSize) <= 512);
 
             usbd->ep_transc[ep][TRANSC_IN] = USBCore_::transcInHelper;
             usbd->ep_transc[ep][TRANSC_OUT] = USBCore_::transcOutHelper;
@@ -282,9 +308,15 @@ public:
                 return REQ_NOTSUPP;
             }
         } else {
-            if (!PluggableUSB().setup(setup)) {
-                return REQ_NOTSUPP;
+#ifdef USE_CDC_SERIAL
+            if (CDCACM().setup(setup))
+                return REQ_SUPP;
+#endif
+            if (PluggableUSB().setup(setup)) {
+                return REQ_SUPP;
             }
+
+            return REQ_NOTSUPP;
         }
 
         return REQ_SUPP;
@@ -365,29 +397,16 @@ int USBCore_::sendControl(uint8_t flags, const void* data, int len)
 
 // Does not timeout or cross fifo boundaries. Returns the number of
 // octets read.
-int USBCore_::recvControl(void* d, int len)
+int USBCore_::recvControl(void* data, int len)
 {
-    auto read = 0;
-    return read;
-    while (read < len) {
-        usbd.drv_handler->ep_rx_enable(&usbd, 0);
-        // TODO: use epBufs
-        //this->waitForDataReady(0);
-        //this->clearDataReady(0);
-        read += usbd.drv_handler->ep_read((uint8_t*)d+read, 0, EP_BUF_SNG);
-
-        // TODO: break if ‘read’ is less than endpoint’s max packet
-        // length, indicating short packet.
-    }
-
-    return read;
+    return this->recv(0, data, len);
 }
 
 // TODO: no idea? this isn’t in the avr 1.8.2 library, although it has
 // the function prototype.
-int USBCore_::recvControlLong(void* d, int len)
+int USBCore_::recvControlLong(void* data, int len)
 {
-    (void)d;
+    (void)data;
     (void)len;
     return -1;
 }
@@ -395,13 +414,13 @@ int USBCore_::recvControlLong(void* d, int len)
 // Number of octets available on OUT endpoint.
 uint8_t USBCore_::available(uint8_t ep)
 {
-    return EPBuffers().buf(ep).len();
+    return EPBuffers().buf(ep).available();
 }
 
 // Space left in IN endpoint buffer.
 uint8_t USBCore_::sendSpace(uint8_t ep)
 {
-    return EPBuffers().buf(ep).remaining();
+    return EPBuffers().buf(ep).sendSpace();
 }
 
 // Blocking send of data to an endpoint. Returns the number of octets
@@ -446,20 +465,33 @@ int USBCore_::send(uint8_t ep, const void* data, int len)
 
 // Non-blocking receive. Returns the number of octets read, or -1 on
 // error.
-int USBCore_::recv(uint8_t ep, void* d, int len)
+int USBCore_::recv(uint8_t ep, void* data, int len)
 {
-    (void)ep;
-    (void)d;
-    (void)len;
-    return -1;
+    uint8_t* d = (uint8_t*)data;
+    auto read = 0;
+
+    while (read < len) {
+        if (this->available(ep) == 0) {
+            // TODO: check for errors that may happen while waiting
+            // for an OUT packet.
+            EPBuffers().buf(ep).fetch(ep);
+        }
+        read += EPBuffers().buf(ep).pop(d+read, len-read);
+    }
+
+    return read;
 }
 
 // Receive one octet from OUT endpoint ‘ep’. Returns -1 if no bytes
 // available.
 int USBCore_::recv(uint8_t ep)
 {
-    (void)ep;
-    return -1;
+    uint8_t c;
+    auto rc = this->recv(ep, &c, sizeof(c));
+    if (rc < 0) {
+        return rc;
+    }
+    return c;
 }
 
 // Flushes an outbound transmission as soon as possible.
@@ -493,7 +525,16 @@ void USBCore_::transcUnknownHelper(usb_dev* usbd, uint8_t ep)
     core->transcUnknown(usbd, ep);
 }
 
-// Called in interrupt context.
+/*
+ * TODO: This is a heck of a monkey patch that just seems to get more
+ * fragile every time functionality is needed in the rest of the
+ * Arduino core.
+ *
+ * It was initially intended to try and use as much of the firmware
+ * library’s code as possible, but it’s just not a good fit, and
+ * should probably be scrapped and started again now that more of its
+ * scope is known.
+ */
 void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep)
 {
     (void)ep;
@@ -555,7 +596,15 @@ void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep)
                 usbd_ep_send(usbd, 0, usbd->transc_in[0].xfer_buf, usbd->transc_in[0].xfer_len);
             } else {
                 /* USB control transfer data out stage */
-                usbd->drv_handler->ep_rx_enable(usbd, 0);
+                this->sendZLP(usbd, 0);
+                // TODO: this is a vestige of the copy from GD’s
+                //source. Unfortunately, it runs afoul of pluggable
+                //usb’s assumptions where if there’s an OUT data
+                //stage, then it’s handled directly in ‘setup’ for the
+                //module, leaving only the status stage to be
+                //completed by the time we get here.
+                //
+                //usbd->drv_handler->ep_rx_enable(usbd, 0);
             }
         }
     } else {
@@ -587,13 +636,22 @@ void USBCore_::sendDeviceConfigDescriptor()
     auto oldMaxWrite = this->maxWrite;
     this->maxWrite = 0;
     uint8_t interfaceCount = 0;
-    uint16_t len = PluggableUSB().getInterface(&interfaceCount);
+    uint16_t len = 0;
+#ifdef USE_CDC_SERIAL
+    interfaceCount += 2;
+    len += CDCACM().getInterface();
+#endif
+    len += PluggableUSB().getInterface(&interfaceCount);
 
     configDesc.wTotalLength = sizeof(configDesc) + len;
     configDesc.bNumInterfaces = interfaceCount;
     this->maxWrite = oldMaxWrite;
     this->sendControl(0, &configDesc, sizeof(configDesc));
     interfaceCount = 0;
+#ifdef USE_CDC_SERIAL
+    interfaceCount += 2;
+    CDCACM().getInterface();
+#endif
     PluggableUSB().getInterface(&interfaceCount);
     // TODO: verify this sends ZLP properly when:
     //   wTotalLength % sizeof(this->buf) == 0
