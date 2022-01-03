@@ -27,9 +27,10 @@ void loop()
     delay(500);
 
     Serial.print(".");
-    /* auto c = Serial.read(); */
-    /* Serial1.print("c: "); */
-    /* Serial1.println((char)c); */
+    if (Serial.available()) {
+        char c = Serial.read();
+        Serial.print(c);
+    }
     BootKeyboard.press(HID_KEYBOARD_A_AND_A);
     BootKeyboard.sendReport();
     BootKeyboard.releaseAll();

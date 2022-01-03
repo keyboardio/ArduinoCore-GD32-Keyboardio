@@ -35,20 +35,28 @@ extern "C" {
 template<size_t L>
 class EPBuffer {
 public:
+    void init(uint8_t ep);
+
     size_t push(const void* d, size_t len);
     size_t pop(void* d, size_t len);
     void reset();
     size_t len();
     size_t available();
     size_t sendSpace();
-    void flush(uint8_t ep);
-    void fetch(uint8_t ep);
+    void flush();
+    void fetch();
     void markComplete();
+    uint8_t* ptr();
+    void enableOutEndpoint();
+
+    void transcIn();
+    void transcOut();
 
 private:
     void waitForDataReady();
     void waitForWriteComplete();
 
+    uint8_t ep;
     uint8_t buf[L];
     uint8_t* tail = buf;
     uint8_t* p = buf;
@@ -65,6 +73,8 @@ private:
 template<size_t L, size_t C>
 class EPBuffers_ {
 public:
+    EPBuffers_();
+
     EPBuffer<L>& buf(uint8_t ep);
     void markComplete(uint8_t ep);
 
