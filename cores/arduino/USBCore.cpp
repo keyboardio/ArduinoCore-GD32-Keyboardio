@@ -103,6 +103,12 @@ usb_desc desc = {
 };
 
 template<size_t L>
+void EPBuffer<L>::init(uint8_t ep)
+{
+    this->ep = ep;
+}
+
+template<size_t L>
 size_t EPBuffer<L>::push(const void *d, size_t len)
 {
     size_t w = min(this->sendSpace(), len);
@@ -117,6 +123,10 @@ size_t EPBuffer<L>::pop(void* d, size_t len)
     size_t r = min(this->available(), len);
     memcpy(d, this->p, r);
     this->p += r;
+
+    if (this->available() == 0) {
+        this->enableOutEndpoint();
+    }
     return r;
 }
 
@@ -146,7 +156,7 @@ size_t EPBuffer<L>::sendSpace()
 }
 
 template<size_t L>
-void EPBuffer<L>::flush(uint8_t ep)
+void EPBuffer<L>::flush()
 {
     this->flCount++;
 
@@ -154,22 +164,30 @@ void EPBuffer<L>::flush(uint8_t ep)
     this->waitForWriteComplete();
 
     this->txWaiting = true;
-    usbd.drv_handler->ep_write(this->buf, ep, this->len());
+    usbd.drv_handler->ep_write(this->buf, this->ep, this->len());
     this->reset();
 }
 
 template<size_t L>
-void EPBuffer<L>::fetch(uint8_t ep)
+void EPBuffer<L>::fetch()
 {
     this->reset();
 
     // Turn on reception and busy loop until we get an OUT packet.
     this->txWaiting = true;
-    usbd.drv_handler->ep_rx_enable(&usbd, ep);
+    usbd.drv_handler->ep_rx_enable(&usbd, this->ep);
     this->waitForDataReady();
 
-    auto read = usbd.drv_handler->ep_read(this->buf, ep, EP_BUF_SNG);
+    auto read = usbd.drv_handler->ep_read(this->buf, this->ep, EP_BUF_SNG);
     this->tail = this->buf + read;
+}
+
+template<size_t L>
+void EPBuffer<L>::enableOutEndpoint()
+{
+    this->reset();
+    usb_transc_config(&usbd.transc_out[this->ep], this->buf, sizeof(this->buf), 0);
+    usbd.drv_handler->ep_rx_enable(&usbd, this->ep);
 }
 
 template<size_t L>
@@ -177,6 +195,25 @@ void EPBuffer<L>::markComplete()
 {
     this->mcCount++;
     this->txWaiting = false;
+}
+
+template<size_t L>
+void EPBuffer<L>::transcOut()
+{
+    this->markComplete();
+    this->tail = this->buf + usbd.transc_out[this->ep].xfer_count;
+}
+
+template<size_t L>
+void EPBuffer<L>::transcIn()
+{
+    this->markComplete();
+}
+
+template<size_t L>
+uint8_t* EPBuffer<L>::ptr()
+{
+    return this->buf;
 }
 
 // Busy loop until an OUT packet is received on endpoint ‘ep’.
@@ -215,6 +252,14 @@ void EPBuffer<L>::waitForWriteComplete()
             USBD_EP_TX_ST_CLEAR(ep_num);
             EPBuffers().markComplete(ep_num);
         }
+    }
+}
+
+template<size_t L, size_t C>
+EPBuffers_<L, C>::EPBuffers_()
+{
+    for (uint8_t ep = 0; ep < C; ep++) {
+        this->buf(ep).init(ep);
     }
 }
 
@@ -280,6 +325,15 @@ public:
             usbd->ep_transc[ep][TRANSC_IN] = USBCore_::transcInHelper;
             usbd->ep_transc[ep][TRANSC_OUT] = USBCore_::transcOutHelper;
             usbd->drv_handler->ep_setup(usbd, EP_BUF_SNG, buf_offset, &ep_desc);
+
+            /*
+             * Allow data to come in to OUT buffers immediately, as it
+             * will be copied out as it comes in.
+             */
+            if (EPTYPE_DIR(epBufferInfo) == 0) {
+                EPBuffers().buf(ep).enableOutEndpoint();
+            }
+
             buf_offset += ep_desc.wMaxPacketSize;
         }
         return USBD_OK;
@@ -468,18 +522,7 @@ int USBCore_::send(uint8_t ep, const void* data, int len)
 int USBCore_::recv(uint8_t ep, void* data, int len)
 {
     uint8_t* d = (uint8_t*)data;
-    auto read = 0;
-
-    while (read < len) {
-        if (this->available(ep) == 0) {
-            // TODO: check for errors that may happen while waiting
-            // for an OUT packet.
-            EPBuffers().buf(ep).fetch(ep);
-        }
-        read += EPBuffers().buf(ep).pop(d+read, len-read);
-    }
-
-    return read;
+    return EPBuffers().buf(ep).pop(d, len);
 }
 
 // Receive one octet from OUT endpoint ‘ep’. Returns -1 if no bytes
@@ -497,7 +540,7 @@ int USBCore_::recv(uint8_t ep)
 // Flushes an outbound transmission as soon as possible.
 int USBCore_::flush(uint8_t ep)
 {
-    EPBuffers().buf(ep).flush(ep);
+    EPBuffers().buf(ep).flush();
     return 0;
 }
 
@@ -510,12 +553,14 @@ void USBCore_::transcSetupHelper(usb_dev* usbd, uint8_t ep)
 void USBCore_::transcOutHelper(usb_dev* usbd, uint8_t ep)
 {
     USBCore_* core = (USBCore_*)usbd->user_data;
+    EPBuffers().buf(ep).transcOut();
     core->transcOut(usbd, ep);
 }
 
 void USBCore_::transcInHelper(usb_dev* usbd, uint8_t ep)
 {
     USBCore_* core = (USBCore_*)usbd->user_data;
+    EPBuffers().buf(ep).transcIn();
     core->transcIn(usbd, ep);
 }
 
@@ -615,14 +660,14 @@ void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep)
 // Called in interrupt context.
 void USBCore_::transcOut(usb_dev* usbd, uint8_t ep)
 {
-    EPBuffers().markComplete(ep);
+    EPBuffers().buf(ep).transcOut();
     this->oldTranscOut(usbd, ep);
 }
 
 // Called in interrupt context.
 void USBCore_::transcIn(usb_dev* usbd, uint8_t ep)
 {
-    EPBuffers().markComplete(ep);
+    EPBuffers().buf(ep).transcIn();
     this->oldTranscIn(usbd, ep);
 }
 
