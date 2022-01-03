@@ -45,3 +45,44 @@ keyboardio_model_100.menu.upload_method.stlinkMethod.upload.protocol=stlink
 keyboardio_model_100.menu.upload_method.stlinkMethod.upload.options=
 keyboardio_model_100.menu.upload_method.stlinkMethod.build.upload_flags=-DCONFIG_MAPLE_MINI_NO_DISABLE_DEBUG=1 -DSERIAL_USB -DGENERIC_BOOTLOADER
 keyboardio_model_100.menu.upload_method.stlinkMethod.upload.tool=stlink_upload
+
+
+keyboardio_micro.name=Keyboardio Micro
+
+keyboardio_micro.build.core=arduino
+keyboardio_micro.build.board=keyboardio_micro
+keyboardio_micro.build.mcu=cortex-m4
+# I think this is the right number. It's 2**20. The previous definition was 2**18
+keyboardio_micro.upload.maximum_size=1048576
+keyboardio_micro.upload.maximum_data_size=98304
+
+# These two definitions set -D flags to the compiler to get the right code compiled for our MCU 
+keyboardio_micro.build.series=GD32F30x
+keyboardio_micro.build.product_line=GD32F30X_XD
+keyboardio_micro.build.extra_flags={build.usb_flags} -DKALEIDOSCOPE_HARDWARE_H="Kaleidoscope-Hardware-Keyboardio-Micro.h" 
+
+keyboardio_micro.build.variant=keyboardio_micro
+keyboardio_micro.upload.openocd_script=target/stm32f1x.cfg
+
+keyboardio_micro.build.vid=0x3496
+keyboardio_micro.build.pid=0x0008
+keyboardio_micro.build.usb_product="Micro"
+keyboardio_micro.build.usb_manufacturer="Keyboardio"
+
+
+#Upload menu
+keyboardio_micro.upload.tool.default=dfu-util
+keyboardio_micro.menu.upload_method.dfuUtilMethod=dfu-util (DFU - Keyboardio DAPBoot bootloader)
+keyboardio_micro.menu.upload_method.dfuUtilMethod.upload.protocol=dfu
+keyboardio_micro.menu.upload_method.dfuUtilMethod.upload.tool=dfu-util
+keyboardio_micro.menu.upload_method.dfuUtilMethod.upload.options=
+keyboardio_micro.menu.upload_method.dfuUtilMethod.build.flash_offset=0x2000
+keyboardio_micro.menu.upload_method.dfuUtilMethod.upload.pid=0x0007
+keyboardio_micro.menu.upload_method.dfuUtilMethod.upload.vid=0x3496
+
+keyboardio_micro.menu.upload_method.stlinkMethod=STLink (SWD)
+keyboardio_micro.menu.upload_method.stlinkMethod.upload.protocol=stlink
+keyboardio_micro.menu.upload_method.stlinkMethod.upload.options=
+keyboardio_micro.menu.upload_method.stlinkMethod.build.upload_flags=-DCONFIG_MAPLE_MINI_NO_DISABLE_DEBUG=1 -DSERIAL_USB -DGENERIC_BOOTLOADER
+keyboardio_micro.menu.upload_method.stlinkMethod.upload.tool=stlink_upload
+
