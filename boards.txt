@@ -86,3 +86,45 @@ keyboardio_micro.menu.upload_method.stlinkMethod.upload.options=
 keyboardio_micro.menu.upload_method.stlinkMethod.build.upload_flags=-DCONFIG_MAPLE_MINI_NO_DISABLE_DEBUG=1 -DSERIAL_USB -DGENERIC_BOOTLOADER
 keyboardio_micro.menu.upload_method.stlinkMethod.upload.tool=stlink_upload
 
+
+
+keyboardio_spacecadet.name=Keyboardio Spacecadet
+
+keyboardio_spacecadet.build.core=arduino
+keyboardio_spacecadet.build.board=keyboardio_spacecadet
+keyboardio_spacecadet.build.mcu=cortex-m4
+# I think this is the right number. It's 2**20. The previous definition was 2**18
+keyboardio_spacecadet.upload.maximum_size=1048576
+keyboardio_spacecadet.upload.maximum_data_size=98304
+
+# These two definitions set -D flags to the compiler to get the right code compiled for our MCU 
+keyboardio_spacecadet.build.series=GD32F30x
+keyboardio_spacecadet.build.product_line=GD32F30X_XD
+keyboardio_spacecadet.build.extra_flags={build.usb_flags} -DKALEIDOSCOPE_HARDWARE_H="Kaleidoscope-Hardware-Keyboardio-Spacecadet.h"
+
+keyboardio_spacecadet.build.variant=keyboardio_spacecadet
+keyboardio_spacecadet.upload.openocd_script=target/stm32f1x.cfg
+
+keyboardio_spacecadet.build.vid=0x3496
+keyboardio_spacecadet.build.pid=0x000A
+keyboardio_spacecadet.build.usb_product="Spacecadet"
+keyboardio_spacecadet.build.usb_manufacturer="Keyboardio"
+
+
+#Upload menu
+keyboardio_spacecadet.menu.upload_method.stlinkMethod=STLink (SWD)
+keyboardio_spacecadet.menu.upload_method.stlinkMethod.upload.protocol=stlink
+keyboardio_spacecadet.menu.upload_method.stlinkMethod.upload.options=
+keyboardio_spacecadet.menu.upload_method.stlinkMethod.build.upload_flags=-DCONFIG_MAPLE_MINI_NO_DISABLE_DEBUG=1 -DSERIAL_USB -DGENERIC_BOOTLOADER
+keyboardio_spacecadet.menu.upload_method.stlinkMethod.upload.tool=stlink_upload
+
+
+keyboardio_spacecadet.upload.tool.default=stlink_upload
+keyboardio_spacecadet.menu.upload_method.dfuUtilMethod=dfu-util (DFU - Keyboardio DAPBoot bootloader)
+keyboardio_spacecadet.menu.upload_method.dfuUtilMethod.upload.protocol=dfu
+keyboardio_spacecadet.menu.upload_method.dfuUtilMethod.upload.tool=dfu-util
+keyboardio_spacecadet.menu.upload_method.dfuUtilMethod.upload.options=
+keyboardio_spacecadet.menu.upload_method.dfuUtilMethod.build.flash_offset=0x2000
+keyboardio_spacecadet.menu.upload_method.dfuUtilMethod.upload.pid=0x000B
+keyboardio_spacecadet.menu.upload_method.dfuUtilMethod.upload.vid=0x3496
+
