@@ -319,7 +319,7 @@ class ClassCore
                     },
                     .bEndpointAddress = (uint8_t)(EPTYPE_DIR(epBufferInfo) | ep),
                     .bmAttributes = EPTYPE_TYPE(epBufferInfo),
-                    .wMaxPacketSize = USB_EP_SIZE,
+                    .wMaxPacketSize = EPTYPE_MAXLEN(epBufferInfo),
                     .bInterval = 0
                 };
                 // Don’t overflow the hardware buffer table.

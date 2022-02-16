@@ -12,9 +12,13 @@ extern "C" {
  * Macros for encoding the endpoint into a 16-bit integer containing
  * the endpoint’s direction, and type.
  */
-#define EPTYPE(dir, type)   ((uint16_t)((dir << 8) | type))
-#define EPTYPE_DIR(eptype)  ((uint8_t)(eptype >> 8))
-#define EPTYPE_TYPE(eptype) ((uint8_t)(eptype & 0xff))
+#define EPTYPE(dir, type)                  EPTYPEANDMAXLEN(dir, type, USB_EP_SIZE)
+#define EPTYPEANDMAXLEN(dir, type, maxlen) ((uint16_t)(((dir | (type & 0x3)) << 8) | 0x40))
+#define EPTYPE_DIR(eptype)                 ((uint8_t)((eptype >> 8) & 0xfc))
+#define EPTYPE_TYPE(eptype)                ((uint8_t)((eptype >> 8) & 0x3))
+#define EPTYPE_MAXLEN(eptype)              ((uint8_t)(eptype & 0xff))
+
+// DIR & TYPE << 8 | MAXLEN
 
 /*
  * Mappings from Arduino USB API to USBCore singleton functions.

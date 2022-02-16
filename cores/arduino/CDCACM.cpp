@@ -2,18 +2,17 @@
 
 #include "USBCore.h"
 
+const uint8_t ACM_EP_MAXLEN = 0x10;
+
 CDCACM_::CDCACM_(uint8_t firstInterface, uint8_t firstEndpoint)
 {
-    // TODO: delete this when done debugging
-    Serial1.begin(115200);
-
     this->acmInterface = firstInterface;
     this->dataInterface = firstInterface + 1;
     this->acmEndpoint = firstEndpoint;
     this->outEndpoint = firstEndpoint + 1;
     this->inEndpoint = firstEndpoint + 2;
 
-    *(uint16_t*)epBuffer(this->acmEndpoint) = EPTYPE(USB_TRX_IN, USB_ENDPOINT_TYPE_INTERRUPT);
+    *(uint16_t*)epBuffer(this->acmEndpoint) = EPTYPEANDMAXLEN(USB_TRX_IN, USB_ENDPOINT_TYPE_INTERRUPT, ACM_EP_MAXLEN);
     *(uint16_t*)epBuffer(this->outEndpoint) = EPTYPE(USB_TRX_OUT, USB_ENDPOINT_TYPE_BULK);
     *(uint16_t*)epBuffer(this->inEndpoint) = EPTYPE(USB_TRX_IN, USB_ENDPOINT_TYPE_BULK);
 }
@@ -35,7 +34,7 @@ int CDCACM_::getInterface()
 
         // Communication interface is master, data interface is slave 0
         D_CDCCS(CDC_UNION, this->acmInterface, this->dataInterface),
-        D_ENDPOINT(USB_ENDPOINT_IN(acmEndpoint), USB_ENDPOINT_TYPE_INTERRUPT, 0x10, 0x40),
+        D_ENDPOINT(USB_ENDPOINT_IN(acmEndpoint), USB_ENDPOINT_TYPE_INTERRUPT, ACM_EP_MAXLEN, 0x40),
 
         // CDC data interface
         D_INTERFACE(this->dataInterface, 2, CDC_DATA_INTERFACE_CLASS, 0, 0),
