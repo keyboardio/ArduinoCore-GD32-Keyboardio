@@ -53,25 +53,15 @@ bool CDCACM_::setup(arduino::USBSetup& setup)
 
     if (setup.bmRequestType == REQUEST_DEVICETOHOST_CLASS_INTERFACE) {
         if (setup.bRequest == CDC_GET_LINE_CODING) {
-            Serial1.println("glc");
             USB_SendControl(TRANSFER_RELEASE, (const void*)&this->lineCoding, sizeof(this->lineCoding));
             return true;
         }
     } else if (setup.bmRequestType == REQUEST_HOSTTODEVICE_CLASS_INTERFACE) {
         if (setup.bRequest == CDC_SEND_BREAK) {
-            Serial1.println("sb");
             this->breakValue = ((uint16_t)setup.wValueH << 8) | setup.wValueL;
         } else if (setup.bRequest == CDC_SET_LINE_CODING) {
-            Serial1.print("slc[");
-            auto r = USB_RecvControl((void*)&this->lineCoding, sizeof(this->lineCoding));
-            // uint8_t foo[32];
-            // auto r = USB_RecvControl(&foo, sizeof(foo));
-            Serial1.print(r);
-            Serial1.print("]: ");
-            Serial1.println(this->lineCoding.dwDTERate);
+            USB_RecvControl((void*)&this->lineCoding, sizeof(this->lineCoding));
         } else if (setup.bRequest == CDC_SET_CONTROL_LINE_STATE) {
-            Serial1.print("scls: ");
-            Serial1.println(setup.wValueL);
             this->lineState = setup.wValueL;
         }
         return true;

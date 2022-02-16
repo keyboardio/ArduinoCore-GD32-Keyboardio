@@ -13,7 +13,7 @@ extern "C" {
  * the endpoint’s direction, and type.
  */
 #define EPTYPE(dir, type)                  EPTYPEANDMAXLEN(dir, type, USB_EP_SIZE)
-#define EPTYPEANDMAXLEN(dir, type, maxlen) ((uint16_t)(((dir | (type & 0x3)) << 8) | 0x40))
+#define EPTYPEANDMAXLEN(dir, type, maxlen) ((uint16_t)(((dir | (type & 0x3)) << 8) | maxlen))
 #define EPTYPE_DIR(eptype)                 ((uint8_t)((eptype >> 8) & 0xfc))
 #define EPTYPE_TYPE(eptype)                ((uint8_t)((eptype >> 8) & 0x3))
 #define EPTYPE_MAXLEN(eptype)              ((uint8_t)(eptype & 0xff))
