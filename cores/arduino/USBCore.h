@@ -9,16 +9,44 @@ extern "C" {
 }
 
 /*
- * Macros for encoding the endpoint into a 16-bit integer containing
- * the endpoint’s direction, and type.
+ * Descriptor for storing an endpoint’s direction, type, and max
+ * packet length.
  */
-#define EPTYPE(dir, type)                  EPTYPEANDMAXLEN(dir, type, USB_EP_SIZE)
-#define EPTYPEANDMAXLEN(dir, type, maxlen) ((uint16_t)(((dir | (type & 0x3)) << 8) | maxlen))
-#define EPTYPE_DIR(eptype)                 ((uint8_t)((eptype >> 8) & 0xfc))
-#define EPTYPE_TYPE(eptype)                ((uint8_t)((eptype >> 8) & 0x3))
-#define EPTYPE_MAXLEN(eptype)              ((uint8_t)(eptype & 0xff))
+union EPDesc {
+    struct {
+        uint8_t maxlen;
+        unsigned int type:3;
+        unsigned int dir:5;
+    } parts;
+    unsigned int val;
 
-// DIR & TYPE << 8 | MAXLEN
+    // Default descriptor, in case, I dunno, you need to initialize an
+    // array or something.
+    constexpr EPDesc() : EPDesc(USB_TRX_OUT, USB_EP_ATTR_CTL, USB_EP_SIZE) {}
+
+    // Encode a direction, type, and max packet length in an endpoint
+    // descriptor.
+    constexpr EPDesc(uint8_t dir, uint8_t type) : EPDesc(dir, type, USB_EP_SIZE) {}
+
+    // Encode a direction and type in an endpoint descriptor, using
+    // the device’s max packet length as the endpoint’s.
+    constexpr EPDesc(uint8_t dir, uint8_t type, uint8_t maxlen) : val((dir|type) << 8 | maxlen) {}
+
+    // Extract the direction from an endpoint descriptor.
+    constexpr uint8_t dir() {
+        return this->parts.dir << 3;
+    }
+
+    // Extract the type from an endpoint descriptor.
+    constexpr uint8_t type() {
+        return this->parts.type;
+    }
+
+    // Extract the max packet length from an endpoint descriptor.
+    constexpr uint8_t maxlen() {
+        return this->parts.maxlen;
+    }
+};
 
 /*
  * Mappings from Arduino USB API to USBCore singleton functions.
@@ -83,6 +111,8 @@ class EPBuffers_
 
         EPBuffer<L>& buf(uint8_t ep);
         void markComplete(uint8_t ep);
+
+        static EPDesc* desc(uint8_t ep);
 
     private:
         EPBuffer<L> epBufs[C];

@@ -12,9 +12,9 @@ CDCACM_::CDCACM_(uint8_t firstInterface, uint8_t firstEndpoint)
     this->outEndpoint = firstEndpoint + 1;
     this->inEndpoint = firstEndpoint + 2;
 
-    *(uint16_t*)epBuffer(this->acmEndpoint) = EPTYPEANDMAXLEN(USB_TRX_IN, USB_ENDPOINT_TYPE_INTERRUPT, ACM_EP_MAXLEN);
-    *(uint16_t*)epBuffer(this->outEndpoint) = EPTYPE(USB_TRX_OUT, USB_ENDPOINT_TYPE_BULK);
-    *(uint16_t*)epBuffer(this->inEndpoint) = EPTYPE(USB_TRX_IN, USB_ENDPOINT_TYPE_BULK);
+    *(EPDesc*)epBuffer(this->acmEndpoint) = EPDesc(USB_TRX_IN, USB_ENDPOINT_TYPE_INTERRUPT, ACM_EP_MAXLEN);
+    *(EPDesc*)epBuffer(this->outEndpoint) = EPDesc(USB_TRX_OUT, USB_ENDPOINT_TYPE_BULK);
+    *(EPDesc*)epBuffer(this->inEndpoint) = EPDesc(USB_TRX_IN, USB_ENDPOINT_TYPE_BULK);
 }
 
 int CDCACM_::getInterface()

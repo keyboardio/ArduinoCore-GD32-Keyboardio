@@ -275,6 +275,14 @@ void EPBuffers_<L, C>::markComplete(uint8_t ep)
     this->buf(ep).markComplete();
 }
 
+template<size_t L, size_t C>
+EPDesc* EPBuffers_<L, C>::desc(uint8_t ep)
+{
+    assert(ep < C);
+    static EPDesc descs[C];
+    return &descs[ep];
+}
+
 EPBuffers_<USB_EP_SIZE, EP_COUNT>& EPBuffers()
 {
     static EPBuffers_<USB_EP_SIZE, EP_COUNT> obj;
@@ -311,15 +319,15 @@ class ClassCore
              */
             uint32_t buf_offset = EP0_RX_ADDR + USB_EP_SIZE;
             for (uint8_t ep = 1; ep < PluggableUSB().epCount(); ep++) {
-                uint16_t epBufferInfo = *(uint16_t*)epBuffer(ep);
+                auto desc = *(EPDesc*)epBuffer(ep);
                 usb_desc_ep ep_desc = {
                     .header = {
                         .bLength = sizeof(ep_desc),
                         .bDescriptorType = USB_DESCTYPE_EP,
                     },
-                    .bEndpointAddress = (uint8_t)(EPTYPE_DIR(epBufferInfo) | ep),
-                    .bmAttributes = EPTYPE_TYPE(epBufferInfo),
-                    .wMaxPacketSize = EPTYPE_MAXLEN(epBufferInfo),
+                    .bEndpointAddress = (uint8_t)(desc.dir() | ep),
+                    .bmAttributes = desc.type(),
+                    .wMaxPacketSize = desc.maxlen(),
                     .bInterval = 0
                 };
                 // Don’t overflow the hardware buffer table.
@@ -333,7 +341,7 @@ class ClassCore
                  * Allow data to come in to OUT buffers immediately, as it
                  * will be copied out as it comes in.
                  */
-                if (EPTYPE_DIR(epBufferInfo) == 0) {
+                if (desc.dir() == 0) {
                     EPBuffers().buf(ep).enableOutEndpoint();
                 }
 
@@ -777,6 +785,5 @@ USBCore_& USBCore()
 // -> returns a pointer to the Nth element of the EP buffer structure
 void* epBuffer(unsigned int n)
 {
-    static uint16_t endPoints[EP_COUNT] = { EPTYPE(0, USB_EP_ATTR_CTL) };
-    return &(endPoints[n]);
+    return (void*)EPBuffers().desc(n);
 }
