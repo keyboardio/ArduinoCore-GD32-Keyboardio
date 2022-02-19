@@ -35,6 +35,13 @@ template <uint32_t _storage_size,
           uint32_t _fmc_end = ARDUINO_UPLOAD_MAXIMUM_SIZE>
 class FlashStorage
 {
+    // We need the flash storage to be page aligned, and to span full pages.
+    //
+    // For the sake of simplicity, we only assert on size, and do so assuming
+    // that the page size is 4k. Technically, bank0 pages are only 2k, but
+    // calculating whether the storage size is allowed with different page sizes
+    // involved - at compile time - is trickier than what its worth. As such,
+    // we'll enforce 4k pages here.
     static_assert(_storage_size % 4096 == 0,
                   "Storage must be page aligned, with a size multiple of 4096.");
 
