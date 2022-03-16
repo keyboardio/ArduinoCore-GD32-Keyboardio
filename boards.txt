@@ -5,6 +5,78 @@ menu.upload_method=Upload method
 menu.opt=Optimize
 
 ################################################################################################
+# GD F30X generic boards
+# for our boards..
+gd_generic_f30x.name=GD32F30x generic
+
+gd_generic_f30x.build.core=arduino
+gd_generic_f30x.build.board=gd_generic_f30x
+gd_generic_f30x.build.mcu=cortex-m4
+gd_generic_f30x.build.series=GD32F30x
+
+# create a new entry for a new generic GD32F30x board here
+gd_generic_f30x.menu.pnum.GD32F303CC_GENERIC=GD32F303CC (Generic)
+gd_generic_f30x.menu.pnum.GD32F303CC_GENERIC.upload.maximum_size=262144
+gd_generic_f30x.menu.pnum.GD32F303CC_GENERIC.upload.maximum_data_size=49152
+gd_generic_f30x.menu.pnum.GD32F303CC_GENERIC.build.board=GD32F303CC_GENERIC
+gd_generic_f30x.menu.pnum.GD32F303CC_GENERIC.build.series=GD32F30x
+gd_generic_f30x.menu.pnum.GD32F303CC_GENERIC.build.product_line=GD32F30X_HD
+gd_generic_f30x.menu.pnum.GD32F303CC_GENERIC.build.variant=GD32F303CC_GENERIC
+gd_generic_f30x.menu.pnum.GD32F303CC_GENERIC.upload.openocd_script=target/stm32f1x.cfg
+
+#Upload menu
+gd_generic_f30x.menu.upload_method.serialMethod=gd32flash (Serial)
+gd_generic_f30x.menu.upload_method.serialMethod.upload.protocol= maple_serial
+gd_generic_f30x.menu.upload_method.serialMethod.upload.options=
+gd_generic_f30x.menu.upload_method.serialMethod.build.upload_flags=-DCONFIG_MAPLE_MINI_NO_DISABLE_DEBUG=1
+gd_generic_f30x.menu.upload_method.serialMethod.upload.tool=serial_upload
+
+gd_generic_f30x.menu.upload_method.gdlinkMethod=GDlink (SWD)
+gd_generic_f30x.menu.upload_method.gdlinkMethod.upload.protocol=gdlink
+gd_generic_f30x.menu.upload_method.gdlinkMethod.upload.options=
+gd_generic_f30x.menu.upload_method.gdlinkMethod.build.upload_flags=-DCONFIG_MAPLE_MINI_NO_DISABLE_DEBUG=1 -DSERIAL_USB -DGENERIC_BOOTLOADER
+gd_generic_f30x.menu.upload_method.gdlinkMethod.upload.tool=gdlink_upload
+
+gd_generic_f30x.menu.upload_method.stlinkMethod=STLink (SWD)
+gd_generic_f30x.menu.upload_method.stlinkMethod.upload.protocol=stlink
+gd_generic_f30x.menu.upload_method.stlinkMethod.upload.options=
+gd_generic_f30x.menu.upload_method.stlinkMethod.build.upload_flags=-DCONFIG_MAPLE_MINI_NO_DISABLE_DEBUG=1 -DSERIAL_USB -DGENERIC_BOOTLOADER
+gd_generic_f30x.menu.upload_method.stlinkMethod.upload.tool=stlink_upload
+
+
+gd_generic_f30x.menu.upload_method.jlinkMethod=Jlink (SWD)
+gd_generic_f30x.menu.upload_method.jlinkMethod.upload.protocol=jlink
+gd_generic_f30x.menu.upload_method.jlinkMethod.upload.options=
+gd_generic_f30x.menu.upload_method.jlinkMethod.build.upload_flags=-DCONFIG_MAPLE_MINI_NO_DISABLE_DEBUG=1 -DSERIAL_USB -DGENERIC_BOOTLOADER
+gd_generic_f30x.menu.upload_method.jlinkMethod.upload.tool=jlink_upload
+
+gd_generic_f30x.menu.upload_method.dfuUtilMethod=dfu-util (DFU - STMDuino bootloader)
+gd_generic_f30x.menu.upload_method.dfuUtilMethod.upload.protocol=dfu
+gd_generic_f30x.menu.upload_method.dfuUtilMethod.upload.tool=dfu-util
+gd_generic_f30x.menu.upload_method.dfuUtilMethod.upload.options=
+gd_generic_f30x.menu.upload_method.dfuUtilMethod.build.flash_offset=0x2000
+
+gd_generic_f30x.menu.upload_method.dfuUtilMethod.upload.pid=0x0006
+gd_generic_f30x.menu.upload_method.dfuUtilMethod.upload.vid=0x3496
+
+gd_generic_f30x.build.extra_flags=-DUSB_PRODUCT="foobar" -DUSB_VID=0x3496 -DUSB_PID=0x0006 -DUSB_MANUFACTURER="Keyboardio" -DUSE_CDC_SERIAL=1 '-DKALEIDOSCOPE_HARDWARE_H="Kaleidoscope-Hardware-GD32-Eval.h"' -DUSBCON=1
+
+
+# Optimizations
+gd_generic_f30x.menu.opt.osstd=Smallest (default)
+gd_generic_f30x.menu.opt.o1std=Fast (-O1)
+gd_generic_f30x.menu.opt.o1std.build.flags.optimize=-O1
+gd_generic_f30x.menu.opt.o1std.build.flags.ldspecs=
+gd_generic_f30x.menu.opt.o2std=Faster (-O2)
+gd_generic_f30x.menu.opt.o2std.build.flags.optimize=-O2
+gd_generic_f30x.menu.opt.o2std.build.flags.ldspecs=
+gd_generic_f30x.menu.opt.o3std=Fastest (-O3)
+gd_generic_f30x.menu.opt.o3std.build.flags.optimize=-O3
+gd_generic_f30x.menu.opt.o3std.build.flags.ldspecs=
+gd_generic_f30x.menu.opt.ogstd=Debug (-g)
+gd_generic_f30x.menu.opt.ogstd.build.flags.optimize=-Og
+gd_generic_f30x.menu.opt.ogstd.build.flags.ldspecs=
+################################################################################################
 # Maker: Keyboardio
 ################################################################################################
 keyboardio_model_100.name=Keyboardio Model 100
@@ -16,7 +88,7 @@ keyboardio_model_100.build.mcu=cortex-m4
 keyboardio_model_100.upload.maximum_size=1048576
 keyboardio_model_100.upload.maximum_data_size=98304
 
-# These two definitions set -D flags to the compiler to get the right code compiled for our MCU 
+# These two definitions set -D flags to the compiler to get the right code compiled for our MCU
 keyboardio_model_100.build.series=GD32F30x
 keyboardio_model_100.build.product_line=GD32F30X_XD
 keyboardio_model_100.build.extra_flags={build.usb_flags} -DKALEIDOSCOPE_HARDWARE_H="Kaleidoscope-Hardware-Keyboardio-Model100.h" -DWIRE_I2C_FLAG_TIMEOUT_ADDR_ACK=0xF0U
@@ -56,10 +128,10 @@ keyboardio_micro.build.mcu=cortex-m4
 keyboardio_micro.upload.maximum_size=1048576
 keyboardio_micro.upload.maximum_data_size=98304
 
-# These two definitions set -D flags to the compiler to get the right code compiled for our MCU 
+# These two definitions set -D flags to the compiler to get the right code compiled for our MCU
 keyboardio_micro.build.series=GD32F30x
 keyboardio_micro.build.product_line=GD32F30X_XD
-keyboardio_micro.build.extra_flags={build.usb_flags} -DKALEIDOSCOPE_HARDWARE_H="Kaleidoscope-Hardware-Keyboardio-Micro.h" 
+keyboardio_micro.build.extra_flags={build.usb_flags} -DKALEIDOSCOPE_HARDWARE_H="Kaleidoscope-Hardware-Keyboardio-Micro.h"
 
 keyboardio_micro.build.variant=keyboardio_micro
 keyboardio_micro.upload.openocd_script=target/stm32f1x.cfg
@@ -85,4 +157,3 @@ keyboardio_micro.menu.upload_method.stlinkMethod.upload.protocol=stlink
 keyboardio_micro.menu.upload_method.stlinkMethod.upload.options=
 keyboardio_micro.menu.upload_method.stlinkMethod.build.upload_flags=-DCONFIG_MAPLE_MINI_NO_DISABLE_DEBUG=1 -DSERIAL_USB -DGENERIC_BOOTLOADER
 keyboardio_micro.menu.upload_method.stlinkMethod.upload.tool=stlink_upload
-
