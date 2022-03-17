@@ -90,9 +90,9 @@ class EPBuffer
         void waitForWriteComplete();
 
         uint8_t ep;
-        uint8_t buf[L];
-        uint8_t* tail = buf;
-        uint8_t* p = buf;
+        volatile uint8_t buf[L];
+        volatile uint8_t* tail = buf;
+        volatile uint8_t* p = buf;
 
         // TODO: this should probably be explicitly atomic.
         volatile bool txWaiting = false;

@@ -112,8 +112,10 @@ template<size_t L>
 size_t EPBuffer<L>::push(const void *d, size_t len)
 {
     size_t w = min(this->sendSpace(), len);
-    memcpy(this->p, d, w);
-    this->p += w;
+    const uint8_t* d8 = (const uint8_t*)d;
+    for (size_t i = 0; i < w; i++) {
+        *this->p++ = *d8++;
+    }
     return w;
 }
 
@@ -121,8 +123,10 @@ template<size_t L>
 size_t EPBuffer<L>::pop(void* d, size_t len)
 {
     size_t r = min(this->available(), len);
-    memcpy(d, this->p, r);
-    this->p += r;
+    uint8_t* d8 = (uint8_t*)d;
+    for (size_t i = 0; i < r; i++) {
+        *d8++ = *this->p++;
+    }
 
     if (this->available() == 0) {
         this->enableOutEndpoint();
@@ -158,13 +162,11 @@ size_t EPBuffer<L>::sendSpace()
 template<size_t L>
 void EPBuffer<L>::flush()
 {
-    this->flCount++;
-
     // Busy loop until the previous IN transaction completes.
     this->waitForWriteComplete();
 
     this->txWaiting = true;
-    usbd.drv_handler->ep_write(this->buf, this->ep, this->len());
+    usbd.drv_handler->ep_write((uint8_t*)this->buf, this->ep, this->len());
     this->reset();
 }
 
@@ -185,22 +187,24 @@ void EPBuffer<L>::fetch()
 template<size_t L>
 void EPBuffer<L>::enableOutEndpoint()
 {
+    Serial1.println("en");
     this->reset();
-    usb_transc_config(&usbd.transc_out[this->ep], this->buf, sizeof(this->buf), 0);
+    usb_transc_config(&usbd.transc_out[this->ep], (uint8_t*)this->buf, sizeof(this->buf), 0);
     usbd.drv_handler->ep_rx_enable(&usbd, this->ep);
 }
 
 template<size_t L>
 void EPBuffer<L>::markComplete()
 {
-    this->mcCount++;
     this->txWaiting = false;
 }
 
 template<size_t L>
 void EPBuffer<L>::transcOut()
 {
-    this->markComplete();
+    //usbd.drv_handler->ep_disable(&usbd, this->ep);
+    Serial1.print(" c");
+    Serial1.print(usbd.transc_out[this->ep].xfer_count);
     this->tail = this->buf + usbd.transc_out[this->ep].xfer_count;
 }
 
