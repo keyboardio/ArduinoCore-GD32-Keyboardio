@@ -171,20 +171,6 @@ void EPBuffer<L>::flush()
 }
 
 template<size_t L>
-void EPBuffer<L>::fetch()
-{
-    this->reset();
-
-    // Turn on reception and busy loop until we get an OUT packet.
-    this->txWaiting = true;
-    usbd.drv_handler->ep_rx_enable(&usbd, this->ep);
-    this->waitForDataReady();
-
-    auto read = usbd.drv_handler->ep_read(this->buf, this->ep, EP_BUF_SNG);
-    this->tail = this->buf + read;
-}
-
-template<size_t L>
 void EPBuffer<L>::enableOutEndpoint()
 {
     Serial1.println("en");
@@ -220,28 +206,11 @@ uint8_t* EPBuffer<L>::ptr()
     return this->buf;
 }
 
-// Busy loop until an OUT packet is received on endpoint ‘ep’.
-template<size_t L>
-void EPBuffer<L>::waitForDataReady()
-{
-    while (this->txWaiting) {
-        volatile uint16_t int_status = (uint16_t)USBD_INTF;
-        uint8_t ep_num = int_status & INTF_EPNUM;
-        if ((int_status & INTF_STIF) == INTF_STIF
-            && (int_status & INTF_DIR) == INTF_DIR
-            && (USBD_EPxCS(ep_num) & EPxCS_RX_ST) == EPxCS_RX_ST) {
-            USBD_EP_RX_ST_CLEAR(ep_num);
-            EPBuffers().markComplete(ep_num);
-        }
-    }
-}
-
 // Busy loop until the latest IN packet has been sent from endpoint
 // ‘ep’.
 template<size_t L>
 void EPBuffer<L>::waitForWriteComplete()
 {
-    this->wfwcCount++;
     /*
      * I’m not sure how much of this is necessary, but this is the
      * series of checks that’s used by ‘usbd_isr’ to verify the IN

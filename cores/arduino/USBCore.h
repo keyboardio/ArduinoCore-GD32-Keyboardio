@@ -77,7 +77,6 @@ class EPBuffer
         size_t available();
         size_t sendSpace();
         void flush();
-        void fetch();
         void markComplete();
         uint8_t* ptr();
         void enableOutEndpoint();
@@ -86,7 +85,6 @@ class EPBuffer
         void transcOut();
 
     private:
-        void waitForDataReady();
         void waitForWriteComplete();
 
         uint8_t ep;
@@ -96,11 +94,6 @@ class EPBuffer
 
         // TODO: this should probably be explicitly atomic.
         volatile bool txWaiting = false;
-
-        // TODO: remove this debug stuff
-        uint32_t flCount = 0;
-        uint32_t mcCount = 0;
-        uint32_t wfwcCount = 0;
 };
 
 template<size_t L, size_t C>
