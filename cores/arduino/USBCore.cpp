@@ -545,7 +545,6 @@ void USBCore_::transcSetupHelper(usb_dev* usbd, uint8_t ep)
 void USBCore_::transcOutHelper(usb_dev* usbd, uint8_t ep)
 {
     USBCore_* core = (USBCore_*)usbd->user_data;
-    EPBuffers().buf(ep).transcOut();
     core->transcOut(usbd, ep);
 }
 
