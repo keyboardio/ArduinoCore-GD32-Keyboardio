@@ -653,19 +653,25 @@ void USBCore_::transcSetup(usb_dev* usbd, uint8_t ep)
 void USBCore_::transcOut(usb_dev* usbd, uint8_t ep)
 {
     EPBuffers().buf(ep).transcOut();
-    this->oldTranscOut(usbd, ep);
+    if (ep == 0) {
+        this->oldTranscOut(usbd, ep);
+    }
 }
 
 // Called in interrupt context.
 void USBCore_::transcIn(usb_dev* usbd, uint8_t ep)
 {
     EPBuffers().buf(ep).transcIn();
-    this->oldTranscIn(usbd, ep);
+    if (ep == 0) {
+        this->oldTranscIn(usbd, ep);
+    }
 }
 
 void USBCore_::transcUnknown(usb_dev* usbd, uint8_t ep)
 {
-    this->oldTranscUnknown(usbd, ep);
+    if (ep == 0) {
+        this->oldTranscUnknown(usbd, ep);
+    }
 }
 
 void USBCore_::sendDeviceConfigDescriptor()
