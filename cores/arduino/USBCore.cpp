@@ -122,6 +122,13 @@ size_t EPBuffer<L>::push(const void *d, size_t len)
 template<size_t L>
 size_t EPBuffer<L>::pop(void* d, size_t len)
 {
+    // If there’s nothing ready yet, bounce out. Otherwise the buffer
+    // and its pointers may change underneath us from interrupt
+    // context.
+    if (this->txWaiting) {
+        return 0;
+    }
+
     size_t r = min(this->available(), len);
     uint8_t* d8 = (uint8_t*)d;
     for (size_t i = 0; i < r; i++) {
@@ -173,7 +180,10 @@ void EPBuffer<L>::flush()
 template<size_t L>
 void EPBuffer<L>::enableOutEndpoint()
 {
-    Serial1.println("en");
+    // Don’t attempt to read from the endpoint buffer until it’s
+    // ready.
+    this->txWaiting = true;
+
     this->reset();
     usb_transc_config(&usbd.transc_out[this->ep], (uint8_t*)this->buf, sizeof(this->buf), 0);
     usbd.drv_handler->ep_rx_enable(&usbd, this->ep);
@@ -188,10 +198,10 @@ void EPBuffer<L>::markComplete()
 template<size_t L>
 void EPBuffer<L>::transcOut()
 {
-    //usbd.drv_handler->ep_disable(&usbd, this->ep);
-    Serial1.print(" c");
-    Serial1.print(usbd.transc_out[this->ep].xfer_count);
     this->tail = this->buf + usbd.transc_out[this->ep].xfer_count;
+
+    // We have data, so let the readers in.
+    this->txWaiting = false;
 }
 
 template<size_t L>
