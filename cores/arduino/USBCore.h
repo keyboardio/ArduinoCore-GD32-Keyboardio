@@ -93,6 +93,7 @@ class EPBuffer
         volatile uint8_t* p = buf;
 
         // TODO: this should probably be explicitly atomic.
+        volatile bool rxWaiting = false;
         volatile bool txWaiting = false;
 };
 

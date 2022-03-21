@@ -125,7 +125,7 @@ size_t EPBuffer<L>::pop(void* d, size_t len)
     // If there’s nothing ready yet, bounce out. Otherwise the buffer
     // and its pointers may change underneath us from interrupt
     // context.
-    if (this->txWaiting) {
+    if (this->rxWaiting) {
         return 0;
     }
 
@@ -182,7 +182,7 @@ void EPBuffer<L>::enableOutEndpoint()
 {
     // Don’t attempt to read from the endpoint buffer until it’s
     // ready.
-    this->txWaiting = true;
+    this->rxWaiting = true;
 
     this->reset();
     usb_transc_config(&usbd.transc_out[this->ep], (uint8_t*)this->buf, sizeof(this->buf), 0);
@@ -201,7 +201,7 @@ void EPBuffer<L>::transcOut()
     this->tail = this->buf + usbd.transc_out[this->ep].xfer_count;
 
     // We have data, so let the readers in.
-    this->txWaiting = false;
+    this->rxWaiting = false;
 }
 
 template<size_t L>
