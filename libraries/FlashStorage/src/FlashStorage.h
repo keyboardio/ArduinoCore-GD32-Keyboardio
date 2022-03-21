@@ -53,7 +53,6 @@ class FlashStorage
     public:
         void begin()
         {
-            fmc_unlock();
 
             uint8_t *src = (uint8_t *)data_area_start;
             for (uint32_t i = 0; i < _storage_size; i++) {
@@ -97,6 +96,7 @@ class FlashStorage
             uint32_t address = data_area_start;
             uint32_t *ptrs = (uint32_t *)buffer_;
 
+            fmc_unlock();
             do {
                 uint16_t page_size = pageSizeForAddress(address);
                 fmc_page_erase(address);
@@ -109,5 +109,6 @@ class FlashStorage
                     address += 4U;
                 } while (++i < word_count);
             } while (address < fmc_end_address);
+	    fmc_lock();
         }
 };
