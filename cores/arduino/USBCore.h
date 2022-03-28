@@ -120,6 +120,7 @@ class USBCore_
         USBCore_();
 
         void connect();
+        void disconnect();
 
         /*
          * PluggableUSB interface.

@@ -8,5 +8,6 @@ extern usb_dev usbd;
 
 void usb_init(usb_desc*, usb_class*);
 void usb_connect();
+void usb_disconnect();
 
 #endif

@@ -426,6 +426,12 @@ void USBCore_::connect()
     usb_connect();
 }
 
+void USBCore_::disconnect()
+{
+    usb_disconnect();
+}
+
+
 // Send ‘len’ octets of ‘d’ through the control pipe (endpoint 0).
 // Blocks until ‘len’ octets are sent. Returns the number of octets
 // sent, or -1 on error.
