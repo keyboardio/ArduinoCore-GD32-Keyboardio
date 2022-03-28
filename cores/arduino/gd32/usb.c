@@ -63,6 +63,11 @@ void usb_connect()
     while (usbd.cur_status != USBD_CONFIGURED) {}
 }
 
+void usb_disconnect()
+{
+    usbd_disconnect(&usbd);
+}
+
 void USBD_HP_CAN0_TX_IRQHandler()
 {
     usbd_isr();
