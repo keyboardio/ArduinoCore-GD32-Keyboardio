@@ -83,7 +83,7 @@ class FlashStorage
         void write(uint32_t offset, const uint8_t *data, uint32_t data_size)
         {
             // If we're out of bounds, or try to write too much, bail out.
-            if (offset > _storage_size || data_size > _storage_size)
+            if ((offset + data_size) > _storage_size)
                 return;
 
             for (uint32_t i = 0; i < data_size; i++) {
