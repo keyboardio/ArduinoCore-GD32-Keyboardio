@@ -20,7 +20,7 @@ CDCACM_::CDCACM_(uint8_t firstInterface, uint8_t firstEndpoint)
 int CDCACM_::getInterface()
 {
     static CDCDescriptor desc = {
-        D_IAD(0, 2, CDC_COMMUNICATION_INTERFACE_CLASS, CDC_ABSTRACT_CONTROL_MODEL, 0),
+        D_IAD(this->acmInterface, 2, CDC_COMMUNICATION_INTERFACE_CLASS, CDC_ABSTRACT_CONTROL_MODEL, 0),
 
         // CDC communication interface
         D_INTERFACE(this->acmInterface, 1, CDC_COMMUNICATION_INTERFACE_CLASS, CDC_ABSTRACT_CONTROL_MODEL, 0),
