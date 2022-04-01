@@ -34,9 +34,9 @@ static usb_desc_dev devDesc = {
         .bDescriptorType  = USB_DESCTYPE_DEV
     },
     .bcdUSB                = 0x0200,
-    .bDeviceClass          = 0x00,
-    .bDeviceSubClass       = 0x00,
-    .bDeviceProtocol       = 0x00,
+    .bDeviceClass          = 0xef,
+    .bDeviceSubClass       = 0x02,
+    .bDeviceProtocol       = 0x01,
     // TODO: this depends on what the mcu can support, but this is
     // device dependent code, so nevermind?
     .bMaxPacketSize0       = USB_EP_SIZE,
