@@ -12,7 +12,7 @@
 #undef USBD_LOWPWR_MODE_ENABLE
 
 /* USB feature -- Self Powered */
-#undef USBD_SELF_POWERED
+#undef USBD_IS_SELF_POWERED
 
 /* link power mode support */
 #undef LPM_ENABLED

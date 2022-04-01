@@ -59,7 +59,7 @@ usb_desc_config configDesc = {
     .bNumInterfaces = 0,
     .bConfigurationValue = 1,
     .iConfiguration = 0,
-#ifdef USBD_SELF_POWERED
+#ifdef USBD_IS_SELF_POWERED
 #ifdef USBD_REMOTE_WAKEUP
     .bmAttributes = 0b11100000,
 #else
