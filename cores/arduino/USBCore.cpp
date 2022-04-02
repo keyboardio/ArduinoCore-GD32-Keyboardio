@@ -116,6 +116,7 @@ size_t EPBuffer<L>::push(const void *d, size_t len)
     for (size_t i = 0; i < w; i++) {
         *this->p++ = *d8++;
     }
+    assert(this->p <= this->tail);
     return w;
 }
 
@@ -134,6 +135,7 @@ size_t EPBuffer<L>::pop(void* d, size_t len)
     for (size_t i = 0; i < r; i++) {
         *d8++ = *this->p++;
     }
+    assert(this->p <= this->tail);
 
     if (this->available() == 0) {
         this->enableOutEndpoint();
@@ -151,12 +153,14 @@ void EPBuffer<L>::reset()
 template<size_t L>
 size_t EPBuffer<L>::len()
 {
+    assert(this->p <= this->tail);
     return this->p - this->buf;
 }
 
 template<size_t L>
 size_t EPBuffer<L>::available()
 {
+    assert(this->p <= this->tail);
     return this->tail - this->p;
 }
 
