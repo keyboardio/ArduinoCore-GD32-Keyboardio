@@ -462,7 +462,32 @@ int USBCore_::sendControl(uint8_t flags, const void* data, int len)
 // octets read.
 int USBCore_::recvControl(void* data, int len)
 {
-    return this->recv(0, data, len);
+    uint16_t int_status;
+    uint8_t ep_num;
+    uint32_t ep_st;
+    auto read = 0;
+    while (read < len) {
+        usbd.drv_handler->ep_rx_enable(&usbd, 0);
+        auto rxWaiting = true;
+        while (rxWaiting) {
+            int_status = (uint16_t)USBD_INTF;
+            ep_num = int_status & INTF_EPNUM;
+            ep_st = USBD_EPxCS(ep_num);
+            assert(ep_num == 0); // TODO: don’t bail on non-0 ep, but
+                                 // mark them complete while we wait
+                                 // for 0.
+            if ((int_status & INTF_STIF) == INTF_STIF
+                && (int_status & INTF_DIR) == INTF_DIR
+                && (ep_st & EPxCS_RX_ST) == EPxCS_RX_ST) {
+                USBD_EP_RX_ST_CLEAR(ep_num);
+                rxWaiting = false;
+            }
+        }
+        read += usbd.drv_handler->ep_read((uint8_t *)data+read, 0, (uint8_t)EP_BUF_SNG);
+        rxWaiting = true;
+    }
+    assert(read == len);
+    return read;
 }
 
 // TODO: no idea? this isn’t in the avr 1.8.2 library, although it has
