@@ -116,7 +116,7 @@ size_t EPBuffer<L>::push(const void *d, size_t len)
     for (size_t i = 0; i < w; i++) {
         *this->p++ = *d8++;
     }
-    assert(this->p <= this->tail);
+    assert(this->p >= this->buf);
     return w;
 }
 
@@ -153,7 +153,7 @@ void EPBuffer<L>::reset()
 template<size_t L>
 size_t EPBuffer<L>::len()
 {
-    assert(this->p <= this->tail);
+    assert(this->p >= this->buf);
     return this->p - this->buf;
 }
 
