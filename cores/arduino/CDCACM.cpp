@@ -137,7 +137,6 @@ size_t CDCACM_::write(const uint8_t* d, size_t len)
         this->setWriteError();
         return 0;
     }
-    this->flush();
     return w;
 }
 
