@@ -121,7 +121,7 @@ class CDCACM_ : public Stream
          */
         volatile union {
             LineCoding lineCoding = { 57600, 0x00, 0x00, 0x00 };
-            uint8_t padding_buf[8];
+            uint8_t padding[8];
         } lc;
 
         uint8_t lineState = 0;
