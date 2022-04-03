@@ -111,6 +111,8 @@ class CDCACM_ : public Stream
         uint8_t inEndpoint;
 
         volatile LineCoding lineCoding = { 57600, 0x00, 0x00, 0x00 };
+        uint8_t _padding; // Needed so that writes to lineCoding from
+                          // ‘ep_read’ don’t overflow into lineState.
         uint8_t lineState = 0;
         volatile int32_t breakValue = -1;
 
