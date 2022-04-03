@@ -144,7 +144,6 @@ class USBCore_
         static void transcSetupHelper(usb_dev* usbd, uint8_t ep);
         static void transcOutHelper(usb_dev* usbd, uint8_t ep);
         static void transcInHelper(usb_dev* usbd, uint8_t ep);
-        static void transcUnknownHelper(usb_dev* usbd, uint8_t ep);
 
     private:
         // TODO: verify that this only applies to the control endpoint’s use of wLength
@@ -157,12 +156,10 @@ class USBCore_
         void (*oldTranscSetup)(usb_dev* usbd, uint8_t ep);
         void (*oldTranscOut)(usb_dev* usbd, uint8_t ep);
         void (*oldTranscIn)(usb_dev* usbd, uint8_t ep);
-        void (*oldTranscUnknown)(usb_dev* usbd, uint8_t ep);
 
         void transcSetup(usb_dev* usbd, uint8_t ep);
         void transcOut(usb_dev* usbd, uint8_t ep);
         void transcIn(usb_dev* usbd, uint8_t ep);
-        void transcUnknown(usb_dev* usbd, uint8_t ep);
 
         void sendDeviceConfigDescriptor();
         void sendDeviceStringDescriptor();

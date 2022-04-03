@@ -420,9 +420,6 @@ USBCore_::USBCore_()
 
     this->oldTranscIn = usbd.ep_transc[0][TRANSC_IN];
     usbd.ep_transc[0][TRANSC_IN] = USBCore_::transcInHelper;
-
-    this->oldTranscUnknown = usbd.ep_transc[0][TRANSC_UNKNOWN];
-    usbd.ep_transc[0][TRANSC_UNKNOWN] = USBCore_::transcUnknownHelper;
 }
 
 void USBCore_::connect()
@@ -598,12 +595,6 @@ void USBCore_::transcInHelper(usb_dev* usbd, uint8_t ep)
     core->transcIn(usbd, ep);
 }
 
-void USBCore_::transcUnknownHelper(usb_dev* usbd, uint8_t ep)
-{
-    USBCore_* core = (USBCore_*)usbd->user_data;
-    core->transcUnknown(usbd, ep);
-}
-
 /*
  * TODO: This is a heck of a monkey patch that just seems to get more
  * fragile every time functionality is needed in the rest of the
@@ -706,13 +697,6 @@ void USBCore_::transcIn(usb_dev* usbd, uint8_t ep)
     EPBuffers().buf(ep).transcIn();
     if (ep == 0) {
         this->oldTranscIn(usbd, ep);
-    }
-}
-
-void USBCore_::transcUnknown(usb_dev* usbd, uint8_t ep)
-{
-    if (ep == 0) {
-        this->oldTranscUnknown(usbd, ep);
     }
 }
 
