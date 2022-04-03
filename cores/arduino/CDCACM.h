@@ -110,9 +110,20 @@ class CDCACM_ : public Stream
         uint8_t outEndpoint;
         uint8_t inEndpoint;
 
-        volatile LineCoding lineCoding = { 57600, 0x00, 0x00, 0x00 };
-        uint8_t _padding; // Needed so that writes to lineCoding from
-                          // ‘ep_read’ don’t overflow into lineState.
+        /*
+         * Create unions for the ‘lineCoding’ field that have backing
+         * buffers that are modulo 16 bits in size.
+         *
+         * This is currently necessary because these fields are read
+         * directly from the USB peripheral with ‘usbd_ep_data_read’,
+         * which can only read in 16-bit chunks (as of version 2.1.2
+         * of the firmware library).
+         */
+        volatile union {
+            LineCoding lineCoding = { 57600, 0x00, 0x00, 0x00 };
+            uint8_t padding_buf[8];
+        } lc;
+
         uint8_t lineState = 0;
         volatile int32_t breakValue = -1;
 

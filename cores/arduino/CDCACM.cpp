@@ -53,14 +53,14 @@ bool CDCACM_::setup(arduino::USBSetup& setup)
 
     if (setup.bmRequestType == REQUEST_DEVICETOHOST_CLASS_INTERFACE) {
         if (setup.bRequest == CDC_GET_LINE_CODING) {
-            USB_SendControl(TRANSFER_RELEASE, (const void*)&this->lineCoding, sizeof(this->lineCoding));
+            USB_SendControl(TRANSFER_RELEASE, (const void*)&this->lc.lineCoding, sizeof(this->lc.lineCoding));
             return true;
         }
     } else if (setup.bmRequestType == REQUEST_HOSTTODEVICE_CLASS_INTERFACE) {
         if (setup.bRequest == CDC_SEND_BREAK) {
             this->breakValue = ((uint16_t)setup.wValueH << 8) | setup.wValueL;
         } else if (setup.bRequest == CDC_SET_LINE_CODING) {
-            USB_RecvControl((void*)&this->lineCoding, sizeof(this->lineCoding));
+            USB_RecvControl((void*)&this->lc.lineCoding, sizeof(this->lc.lineCoding));
         } else if (setup.bRequest == CDC_SET_CONTROL_LINE_STATE) {
             this->lineState = setup.wValueL;
         }
