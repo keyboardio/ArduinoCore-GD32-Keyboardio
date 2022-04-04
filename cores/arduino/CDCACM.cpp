@@ -4,6 +4,17 @@
 
 const uint8_t ACM_EP_MAXLEN = 0x10;
 
+static uint8_t IN_ENDPOINT = 0;
+
+static uint8_t cdc_flush_sof(usb_dev *usbd) {
+    USB_Flush(IN_ENDPOINT);
+    return 0;
+}
+
+usbd_int_cb_struct usb_inthandler = {
+    cdc_flush_sof,
+};
+
 CDCACM_::CDCACM_(uint8_t firstInterface, uint8_t firstEndpoint)
 {
     this->acmInterface = firstInterface;
@@ -11,6 +22,7 @@ CDCACM_::CDCACM_(uint8_t firstInterface, uint8_t firstEndpoint)
     this->acmEndpoint = firstEndpoint;
     this->outEndpoint = firstEndpoint + 1;
     this->inEndpoint = firstEndpoint + 2;
+    IN_ENDPOINT = this->inEndpoint;
 
     *(EPDesc*)epBuffer(this->acmEndpoint) = EPDesc(USB_TRX_IN, USB_ENDPOINT_TYPE_INTERRUPT, ACM_EP_MAXLEN);
     *(EPDesc*)epBuffer(this->outEndpoint) = EPDesc(USB_TRX_OUT, USB_ENDPOINT_TYPE_BULK);
@@ -63,6 +75,11 @@ bool CDCACM_::setup(arduino::USBSetup& setup)
             USB_RecvControl((void*)&this->lc.lineCoding, sizeof(this->lc.lineCoding));
         } else if (setup.bRequest == CDC_SET_CONTROL_LINE_STATE) {
             this->lineState = setup.wValueL;
+            if (this->lineState > 0) {
+                usbd_int_fops = &usb_inthandler;
+            } else {
+                usbd_int_fops = nullptr;
+            }
         }
         return true;
     }
