@@ -173,6 +173,11 @@ size_t EPBuffer<L>::sendSpace()
 template<size_t L>
 void EPBuffer<L>::flush()
 {
+    // Bounce if there’s no data to send.
+    if (this->len() == 0) {
+        return;
+    }
+
     // Busy loop until the previous IN transaction completes.
     this->waitForWriteComplete();
 
