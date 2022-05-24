@@ -28,6 +28,8 @@ keyboardio_model_100.build.vid=0x3496
 keyboardio_model_100.build.pid=0x0006
 keyboardio_model_100.build.usb_product="Model 100"
 keyboardio_model_100.build.usb_manufacturer="Keyboardio"
+keyboardio_model_100.build.flashing_instructions="To update your keyboard's firmware, hold down the 'Prog' key on your keyboard.\n\n(When flashing starts, you can release it.)"
+
 
 
 #Upload menu
