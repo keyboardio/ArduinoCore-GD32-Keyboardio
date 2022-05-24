@@ -94,10 +94,14 @@ void CDCACM_::begin(uint32_t baud)
 void CDCACM_::begin(uint32_t baud, uint8_t config)
 {
     this->peekBuffer = -1;
+    this->dataTransmitted = false;
 }
 
 void CDCACM_::end()
 {
+        if ((this->lc.lineCoding.dwDTERate == 1200) && this->dataTransmitted == false) {
+                NVIC_SystemReset();
+        }
 }
 
 CDCACM_::operator bool()
@@ -117,6 +121,9 @@ int CDCACM_::peek()
 {
     if (this->peekBuffer < 0) {
         this->peekBuffer = USB_Recv(this->outEndpoint);
+        if (this->peekBuffer >=0) {
+                this->dataTransmitted = true;
+        }
     }
     return this->peekBuffer;
 }
@@ -124,7 +131,11 @@ int CDCACM_::peek()
 int CDCACM_::read()
 {
     if (this->peekBuffer < 0) {
-        return USB_Recv(this->outEndpoint);
+        int data = USB_Recv(this->outEndpoint);
+        if (data >= 0 ) {
+                this->dataTransmitted = true;
+        }
+        return data;
     }
 
     auto rc = this->peekBuffer;
@@ -144,6 +155,7 @@ size_t CDCACM_::write(uint8_t c)
 
 size_t CDCACM_::write(const uint8_t* d, size_t len)
 {
+    this->dataTransmitted == true;
     if (this->lineState <= 0) {
         this->setWriteError();
         return 0;

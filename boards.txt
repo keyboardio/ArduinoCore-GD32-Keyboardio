@@ -26,11 +26,13 @@ keyboardio_model_100.upload.openocd_script=target/stm32f1x.cfg
 
 keyboardio_model_100.build.vid=0x3496
 keyboardio_model_100.build.pid=0x0006
+keyboardio_model_100.vid.0=0x3496
+keyboardio_model_100.pid.0=0x0006
+keyboardio_model_100.vid.1=0x3496
+keyboardio_model_100.pid.1=0x0005
 keyboardio_model_100.build.usb_product="Model 100"
 keyboardio_model_100.build.usb_manufacturer="Keyboardio"
 keyboardio_model_100.build.flashing_instructions="To update your keyboard's firmware, hold down the 'Prog' key on your keyboard.\n\n(When flashing starts, you can release it.)"
-
-
 
 #Upload menu
 keyboardio_model_100.upload.tool.default=dfu-util

@@ -109,6 +109,7 @@ class CDCACM_ : public Stream
         uint8_t acmEndpoint;
         uint8_t outEndpoint;
         uint8_t inEndpoint;
+        bool dataTransmitted = false;
 
         /*
          * Create unions for the ‘lineCoding’ field that have backing
