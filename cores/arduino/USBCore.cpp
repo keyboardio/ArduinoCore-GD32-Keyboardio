@@ -241,8 +241,8 @@ void EPBuffer<L>::waitForWriteComplete()
         if ((int_status & INTF_STIF) == INTF_STIF
             && (int_status & INTF_DIR) == 0
             && (USBD_EPxCS(ep_num) & EPxCS_TX_ST) == EPxCS_TX_ST) {
-            USBD_EP_TX_ST_CLEAR(ep_num);
             EPBuffers().markComplete(ep_num);
+            USBD_EP_TX_ST_CLEAR(ep_num);
         }
     }
 }
