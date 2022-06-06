@@ -106,6 +106,9 @@ template<size_t L>
 void EPBuffer<L>::init(uint8_t ep)
 {
     this->ep = ep;
+    this->reset();
+    this->rxWaiting = false;
+    this->txWaiting = false;
 }
 
 template<size_t L>
@@ -333,6 +336,7 @@ class ClassCore
                  * Allow data to come in to OUT buffers immediately, as it
                  * will be copied out as it comes in.
                  */
+                EPBuffers().buf(ep).init(ep);
                 if (desc.dir() == 0) {
                     EPBuffers().buf(ep).enableOutEndpoint();
                 }
