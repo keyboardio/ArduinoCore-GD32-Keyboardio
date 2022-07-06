@@ -76,7 +76,7 @@ bool CDCACM_::setup(arduino::USBSetup& setup)
         } else if (setup.bRequest == CDC_SET_CONTROL_LINE_STATE) {
             this->lineState = setup.wValueL;
             if (this->lineState > 0) {
-                usbd_int_fops = &usb_inthandler;
+                // usbd_int_fops = &usb_inthandler;
             } else {
                 usbd_int_fops = nullptr;
             }
