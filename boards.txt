@@ -103,3 +103,59 @@ keyboardio_micro.menu.upload_method.stlinkMethod.upload.options=
 keyboardio_micro.menu.upload_method.stlinkMethod.build.upload_flags=-DCONFIG_MAPLE_MINI_NO_DISABLE_DEBUG=1 -DSERIAL_USB -DGENERIC_BOOTLOADER
 keyboardio_micro.menu.upload_method.stlinkMethod.upload.tool=stlink_upload
 
+keyboardio_model_100u.name=Keyboardio Model 100u (Unreleased)
+
+keyboardio_model_100u.build.core=arduino
+keyboardio_model_100u.build.board=keyboardio_model_100u
+keyboardio_model_100u.build.mcu=cortex-m4
+# I think this is the right number. It's 2**20. The previous definition was 2**18
+keyboardio_model_100u.upload.maximum_size=1048576
+keyboardio_model_100u.upload.maximum_data_size=98304
+keyboardio_model_100u.upload.use_1200bps_touch=true
+# This needs to be set to true to work around a race condition on Linux
+# systems with udev. Otherwise, udev might not update the permissions
+# on the DFU device to allow non-root access before dfu-util runs.
+# This will time out, and issue a warning, because Arduino expects to see
+# a serial port. However, that gives udev time to update the permissions
+# before dfu-util runs.
+keyboardio_model_100u.upload.wait_for_upload_port=true
+keyboardio_model_100u.upload_port.vid.0=0x3496
+keyboardio_model_100u.upload_port.pid.0=0x000a
+keyboardio_model_100u.upload_port.vid.1=0x3496
+keyboardio_model_100u.upload_port.pid.1=0x0009
+
+# These two definitions set -D flags to the compiler to get the right code compiled for our MCU 
+keyboardio_model_100u.build.series=GD32F30x
+keyboardio_model_100u.build.product_line=GD32F30X_XD
+keyboardio_model_100u.build.extra_flags={build.usb_flags} -DUSBCON -DUSBD_USE_CDC -DKALEIDOSCOPE_HARDWARE_H="Kaleidoscope-Hardware-Keyboardio-Model100u.h" -DWIRE_I2C_FLAG_TIMEOUT_ADDR_ACK=0xF0U
+
+keyboardio_model_100u.build.variant=keyboardio_model_100u
+keyboardio_model_100u.upload.openocd_script=target/stm32f1x.cfg
+
+keyboardio_model_100u.vid.0=0x3496
+keyboardio_model_100u.pid.0=0x000a
+keyboardio_model_100u.vid.1=0x3496
+keyboardio_model_100u.pid.1=0x0009
+keyboardio_model_100u.build.vid=0x3496
+keyboardio_model_100u.build.pid=0x000a
+keyboardio_model_100u.build.usb_product="Model 100u"
+keyboardio_model_100u.build.usb_manufacturer="Keyboardio"
+keyboardio_model_100u.build.flashing_instructions="To update your keyboard's firmware, hold down the 'Prog' key on your keyboard. (When flashing starts, you can release it.)"
+
+
+#Upload menu
+keyboardio_model_100u.upload.tool.default=dfu-util
+keyboardio_model_100u.menu.upload_method.dfuUtilMethod=dfu-util (DFU - Keyboardio DAPBoot bootloader)
+keyboardio_model_100u.menu.upload_method.dfuUtilMethod.upload.protocol=dfu
+keyboardio_model_100u.menu.upload_method.dfuUtilMethod.upload.tool=dfu-util
+keyboardio_model_100u.menu.upload_method.dfuUtilMethod.upload.options=
+keyboardio_model_100u.menu.upload_method.dfuUtilMethod.build.flash_offset=0x2000
+keyboardio_model_100u.menu.upload_method.dfuUtilMethod.upload.pid=0x0009
+keyboardio_model_100u.menu.upload_method.dfuUtilMethod.upload.vid=0x3496
+
+keyboardio_model_100u.menu.upload_method.stlinkMethod=STLink (SWD)
+keyboardio_model_100u.menu.upload_method.stlinkMethod.upload.protocol=stlink
+keyboardio_model_100u.menu.upload_method.stlinkMethod.upload.options=
+keyboardio_model_100u.menu.upload_method.stlinkMethod.build.upload_flags=-DCONFIG_MAPLE_MINI_NO_DISABLE_DEBUG=1 -DSERIAL_USB -DGENERIC_BOOTLOADER
+keyboardio_model_100u.menu.upload_method.stlinkMethod.upload.tool=stlink_upload
+
