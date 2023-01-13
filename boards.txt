@@ -159,3 +159,62 @@ keyboardio_model_100u.menu.upload_method.stlinkMethod.upload.options=
 keyboardio_model_100u.menu.upload_method.stlinkMethod.build.upload_flags=-DCONFIG_MAPLE_MINI_NO_DISABLE_DEBUG=1 -DSERIAL_USB -DGENERIC_BOOTLOADER
 keyboardio_model_100u.menu.upload_method.stlinkMethod.upload.tool=stlink_upload
 
+
+
+keyboardio_alto.name=Keyboardio Alto (Unreleased)
+
+keyboardio_alto.build.core=arduino
+keyboardio_alto.build.board=keyboardio_alto
+keyboardio_alto.build.mcu=cortex-m4
+# I think this is the right number. It's 2**20. The previous definition was 2**18
+keyboardio_alto.upload.maximum_size=1048576
+keyboardio_alto.upload.maximum_data_size=98304
+keyboardio_alto.upload.use_1200bps_touch=true
+# This needs to be set to true to work around a race condition on Linux
+# systems with udev. Otherwise, udev might not update the permissions
+# on the DFU device to allow non-root access before dfu-util runs.
+# This will time out, and issue a warning, because Arduino expects to see
+# a serial port. However, that gives udev time to update the permissions
+# before dfu-util runs.
+keyboardio_alto.upload.wait_for_upload_port=true
+keyboardio_alto.upload_port.vid.0=0x3496
+keyboardio_alto.upload_port.pid.0=0x000c
+keyboardio_alto.upload_port.vid.1=0x3496
+keyboardio_alto.upload_port.pid.1=0x000b
+
+# These two definitions set -D flags to the compiler to get the right code compiled for our MCU 
+keyboardio_alto.build.series=GD32F30x
+keyboardio_alto.build.product_line=GD32F30X_XD
+keyboardio_alto.build.extra_flags={build.usb_flags} -DUSBCON -DUSBD_USE_CDC -DKALEIDOSCOPE_HARDWARE_H="Kaleidoscope-Hardware-Keyboardio-Alto.h" -DWIRE_I2C_FLAG_TIMEOUT_ADDR_ACK=0xF0U
+
+keyboardio_alto.build.variant=keyboardio_alto
+keyboardio_alto.upload.openocd_script=target/stm32f1x.cfg
+
+keyboardio_alto.vid.0=0x3496
+keyboardio_alto.pid.0=0x000c
+keyboardio_alto.vid.1=0x3496
+keyboardio_alto.pid.1=0x000b
+keyboardio_alto.build.vid=0x3496
+keyboardio_alto.build.pid=0x000c
+keyboardio_alto.build.usb_product="Alto"
+keyboardio_alto.build.usb_manufacturer="Keyboardio"
+keyboardio_alto.build.flashing_instructions="To update your keyboard's firmware, hold down the 'Prog' key on your keyboard. (When flashing starts, you can release it.)"
+
+
+#Upload menu
+keyboardio_alto.upload.tool.default=dfu-util
+keyboardio_alto.menu.upload_method.dfuUtilMethod=dfu-util (DFU - Keyboardio DAPBoot bootloader)
+keyboardio_alto.menu.upload_method.dfuUtilMethod.upload.protocol=dfu
+keyboardio_alto.menu.upload_method.dfuUtilMethod.upload.tool=dfu-util
+keyboardio_alto.menu.upload_method.dfuUtilMethod.upload.options=
+keyboardio_alto.menu.upload_method.dfuUtilMethod.build.flash_offset=0x2000
+keyboardio_alto.menu.upload_method.dfuUtilMethod.upload.pid=0x000b
+keyboardio_alto.menu.upload_method.dfuUtilMethod.upload.vid=0x3496
+
+keyboardio_alto.menu.upload_method.stlinkMethod=STLink (SWD)
+keyboardio_alto.menu.upload_method.stlinkMethod.upload.protocol=stlink
+keyboardio_alto.menu.upload_method.stlinkMethod.upload.options=
+keyboardio_alto.menu.upload_method.stlinkMethod.build.upload_flags=-DCONFIG_MAPLE_MINI_NO_DISABLE_DEBUG=1 -DSERIAL_USB -DGENERIC_BOOTLOADER
+keyboardio_alto.menu.upload_method.stlinkMethod.upload.tool=stlink_upload
+
+
