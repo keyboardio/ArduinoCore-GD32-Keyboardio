@@ -95,6 +95,7 @@ class EPBuffer
         void flush();
         uint8_t* ptr();
         void enableOutEndpoint();
+        void setTimeout(uint16_t timeout);
 
         void transcIn();
         void transcOut();
@@ -130,6 +131,10 @@ class EPBuffer
          * Prevent more than one simultaneous call to ‘flush’.
          */
         volatile bool currentlyFlushing = false;
+
+        volatile uint32_t startTime;
+        uint16_t timeout;
+        volatile bool timedOut;
 
         uint8_t ep;
 };
@@ -174,6 +179,13 @@ class USBCore_
         int recv(uint8_t ep);
         int flush(uint8_t ep);
         void setResetHook(void (*hook)());
+        void setTimeout(uint8_t ep, uint16_t timeout);
+
+        // Debug counters
+        volatile uint16_t nreset;
+        volatile uint16_t nsusp;
+        volatile uint16_t nresume;
+        volatile uint16_t nerror;
 
         uint8_t setupCtlOut(usb_req* req);
         void setupClass(uint16_t wLength);

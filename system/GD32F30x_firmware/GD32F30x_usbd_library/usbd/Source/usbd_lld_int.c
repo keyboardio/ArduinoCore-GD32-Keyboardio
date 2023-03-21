@@ -144,6 +144,9 @@ void usbd_isr (void)
 
                             USBD_EP_RX_ST_CLEAR(ep_num);
                             if (count != USB_SETUP_PACKET_LEN) {
+#ifdef USBD_ERROR_HOOKS
+                                udev->drv_handler->setup_err(count);
+#endif
                                 usb_stall_transc(udev);
 
                                 return;
@@ -203,10 +206,13 @@ void usbd_isr (void)
         }
     }
 
+#ifdef USBD_ERROR_HOOKS
+    if (INTF_ERRIF & int_flag) {
+        udev->drv_handler->err();
+        CLR(ERRIF);
+    }
+#endif
     if (INTF_WKUPIF & int_flag) {
-        /* clear wakeup interrupt flag in INTF */
-        CLR(WKUPIF);
-
         /* restore the old cur_status */
         udev->cur_status = udev->backup_status;
 
@@ -226,6 +232,9 @@ void usbd_isr (void)
             resume_mcu(udev);
         }
 #endif /* LPM_ENABLED */
+
+        /* clear wakeup interrupt flag in INTF */
+        CLR(WKUPIF);
     }
 
     if (INTF_SPSIF & int_flag) {

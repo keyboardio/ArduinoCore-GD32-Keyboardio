@@ -61,7 +61,6 @@ void usb_connect()
 {
     nvic_config();
     usbd_connect(&usbd);
-    while (usbd.cur_status != USBD_CONFIGURED) {}
 }
 
 void usb_enable_interrupts()

@@ -71,6 +71,10 @@ static void usbd_ep_stall_clear (usb_dev *udev, uint8_t ep_addr);
 static void usbd_ep_data_write (uint8_t *user_fifo, uint8_t ep_num, uint16_t bytes);
 static uint16_t usbd_ep_data_read (uint8_t *user_fifo, uint8_t ep_num, uint8_t buf_kind);
 static void usbd_resume (usb_dev *udev);
+#ifdef USBD_ERROR_HOOKS
+static void usbd_err (void);
+static void usbd_setup_err (uint8_t len);
+#endif
 static void usbd_suspend (void);
 static void usbd_leave_suspend (void);
 static uint16_t usbd_ep_status (usb_dev *udev, uint8_t ep_addr);
@@ -83,6 +87,10 @@ struct _usb_handler usbd_drv_handler =
     .suspend        = usbd_suspend,
     .suspend_leave  = usbd_leave_suspend,
     .resume         = usbd_resume,
+#ifdef USBD_ERROR_HOOKS
+    .err            = usbd_err,
+    .setup_err      = usbd_setup_err,
+#endif
     .set_addr       = usbd_address_set,
     .ep_reset       = usbd_ep_reset,
     .ep_disable     = usbd_ep_disable,
@@ -158,7 +166,11 @@ static void usbd_core_reset (void)
 #endif /* LPM_ENABLED */
 
     /* enable all interrupts mask bits */
+#ifdef USBD_ERROR_HOOKS
+    USBD_CTL |= CTL_STIE | CTL_ERRIE | CTL_WKUPIE | CTL_SPSIE | CTL_SOFIE | CTL_ESOFIE | CTL_RSTIE;
+#else
     USBD_CTL |= CTL_STIE | CTL_WKUPIE | CTL_SPSIE | CTL_SOFIE | CTL_ESOFIE | CTL_RSTIE;
+#endif
 }
 
 /*!
@@ -612,6 +624,30 @@ static void usbd_resume (usb_dev *udev)
         USBD_CTL |= CTL_RSREQ;
     }
 }
+
+#ifdef USBD_ERROR_HOOKS
+/*!
+    \brief      error interrupt hook
+    \param[in]  none
+    \param[out] none
+    \retval     none
+*/
+static void usbd_err (void)
+{
+    return;
+}
+
+/*!
+    \brief      setup error hook
+    \param[in]  len: length of erroneous setup packet
+    \param[out] none
+    \retval     none
+*/
+static void usbd_setup_err (uint8_t len)
+{
+    (void)len;
+}
+#endif
 
 /*!
     \brief      set USB device to leave mode

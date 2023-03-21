@@ -219,6 +219,10 @@ struct _usb_handler
     void (*suspend)          (void);
     void (*suspend_leave)    (void);
     void (*resume)           (usb_dev *udev);
+#ifdef USBD_ERROR_HOOKS
+    void (*err)              (void);
+    void (*setup_err)        (uint8_t len);
+#endif
 
     void (*ep_reset)         (usb_dev *udev);
     void (*ep_setup)         (usb_dev *udev, uint8_t buf_kind, uint32_t buf_addr, const usb_desc_ep *ep_desc);

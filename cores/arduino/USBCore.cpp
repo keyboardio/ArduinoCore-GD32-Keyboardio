@@ -133,6 +133,14 @@ void EPBuffer<L>::init(uint8_t ep)
     this->reset();
     this->rxWaiting = false;
     this->txWaiting = false;
+    this->timedOut = false;
+    this->timeout = 100;
+}
+
+template<size_t L>
+void EPBuffer<L>::setTimeout(uint16_t timeout)
+{
+    this->timeout = timeout;
 }
 
 template<size_t L>
@@ -236,6 +244,9 @@ void EPBuffer<L>::flush()
     // fall through
     case USBD_CONFIGURED:
     case USBD_SUSPENDED: {
+        if (this->timedOut) {
+            break;
+        }
         // This will temporarily reenable and disable interrupts
         auto canWrite = this->waitForWriteComplete();
         if (canWrite) {
@@ -246,6 +257,7 @@ void EPBuffer<L>::flush()
             // Only start the next transmission if the device hasn't been
             // reset.
             this->txWaiting = true;
+            this->startTime = millis();
             usbd_ep_send(&USBCore().usbDev(), this->ep, (uint8_t *)this->buf, this->len());
             USBCore().logEP('>', this->ep, '>', this->len());
         }
@@ -287,6 +299,7 @@ template<size_t L>
 void EPBuffer<L>::transcIn()
 {
     this->txWaiting = false;
+    this->timedOut = false;
 }
 
 // Unused?
@@ -302,11 +315,21 @@ uint8_t* EPBuffer<L>::ptr()
 template<size_t L>
 bool EPBuffer<L>::waitForWriteComplete()
 {
-    // auto start = getCurrentMillis();
     auto ok = true;
+    auto desc = *EPBuffers().desc(this->ep);
+    auto udev = &USBCore().usbDev();
+
+    /*
+     * For interrupt EPs, count from now instead of from previous send.
+     * Otherwise, if a send occurs while the bus is suspended, the packet will
+     * be cheated of its full timeout.
+     */
+    if (desc.type() == USB_EP_ATTR_INT) {
+        this->startTime = millis();
+    }
     do {
         usb_enable_interrupts();
-        switch (USBCore().usbDev().cur_status) {
+        switch (udev->cur_status) {
         case USBD_DEFAULT:
         case USBD_ADDRESSED:
             ok = false;
@@ -314,11 +337,95 @@ bool EPBuffer<L>::waitForWriteComplete()
         default:
             break;
         }
-        // if (getCurrentMillis() - start > 5) {
-        //     EPBuffers().buf(ep).transcIn();
-        //     ok = false;
-        // }
         usb_disable_interrupts();
+        if (this->txWaiting && millis() - this->startTime > this->timeout) {
+            USBCore().logEP('X', this->ep, '>', this->len());
+            /*
+             * For interrupt EPs, overwrite the previous packet. In the common
+             * case of a key press HID report initiating a remote wakeup,
+             * transmission of the key release event might be delayed, because
+             * the host can't poll while the bus is suspended. If the
+             * application sends a key release event before the key press event
+             * is transmitted, that might time out. If the key release event is
+             * discarded due to the timeout, the host will never receive the
+             * key release event, leading to a stuck or repeating key.
+             */
+            if (desc.type() == USB_EP_ATTR_INT) {
+                /*
+                 * Set the endpoint status to NAK, in an attempt to prevent
+                 * the queued packet from being transmitted while being
+                 * overwritten.
+                 *
+                 * This must be done in two steps. Unfortunately, the USBD
+                 * peripheral's design doesn't seem to make it possible to
+                 * atomically abort a queued transmission. Even if interrupts
+                 * are disabled, the peripheral state machine continues to run.
+                 *
+                 * The endpoint status control bits are toggle-only (toggle on
+                 * writing 1; unchanged on writing 0). If the TX state
+                 * transitions from VALID to NAK during the read-modify-write,
+                 * a toggle operation (XOR 0b01) intended to transition from
+                 * VALID (0b11) to NAK (0b10) will set the status back to
+                 * VALID. This will cause the previous packet to be sent again.
+                 *
+                 * Instead, set the status to DISABLED (0b00, via XOR 0b11),
+                 * which will become STALL (0b01) if the peripheral transitions
+                 * the status to NAK between the read and the write. This can
+                 * happen if the transmission was in progress and the host ACKs
+                 * exactly between the read and the write to update the status
+                 * bits.
+                 *
+                 * Possible states after the first USBD_EP_TX_STAT_SET:
+                 *
+                 * - DISABLED (metastable if TX in progress)
+                 * - STALL (stable; only possible if we lost the r-m-w race)
+                 * - NAK (stable; only possible if TX completed after toggle)
+                 *
+                 * There is a small theoretical chance that the host will poll
+                 * the endpoint again between the two updates to the status
+                 * bits, which could lead to the host receiving a STALL
+                 * handshake, which would put the data toggle bit out of sync.
+                 *
+                 * The second host poll cannot complete sooner than 34 bit times
+                 * after the ACK from the first host poll. (2 bits inter-packet
+                 * delay, 8 bits sync, 8 bits PID, 16 bits addr/endpoint/CRC,
+                 * about 2.83 microseconds) The second status bit update will
+                 * complete before then, assuming reasonable CPU clock speeds
+                 * and no lengthy interrupt handler executions occurring.
+                 *
+                 * On the other hand, it's unknown when exactly the peripheral
+                 * checks the endpoint status bits to decide which response to
+                 * send to an IN poll. It might latch them at EOP, or SOP, or
+                 * maybe PID, or it might wait until after checking the CRC. So
+                 * the actual available time might be between 0 and 34 bit
+                 * times.
+                 *
+                 * We could globally disable interrupts to mitigate that, if
+                 * necessary.
+                 */
+                USBD_EP_TX_STAT_SET(this->ep, EPTX_DISABLED);
+                if (USBD_EPxCS(this->ep) & EPxCS_TX_STA == EPTX_DISABLED) {
+                    /*
+                     * If the endpoint is disabled, there might still be a
+                     * transmission in progress. Wait for it to complete:
+                     *
+                     * 1 byte sync + 1 byte PID + 64 bytes data + 2 bytes CRC,
+                     * 1 turn-around time,
+                     * 1 byte sync + 1 byte PID (handshake)
+                     * assuming maximum bit stuffing at full speed (12MHz).
+                     */
+                    delayMicroseconds(56);
+                }
+                // In case TX was in progress and completed
+                USBD_EP_TX_ST_CLEAR(this->ep);
+                USBD_EP_TX_STAT_SET(this->ep, EPTX_NAK);
+                break;
+            } else {
+                ok = false;
+                this->timedOut = true;
+                break;
+            }
+        }
     } while (ok && this->txWaiting);
     return ok;
 }
@@ -540,6 +647,7 @@ void (*oldResetHandler)(usb_dev *usbd);
 void handleReset(usb_dev *usbd)
 {
     USBCore().logStatus("Reset");
+    USBCore().nreset++;
     USBCore().setupClass(0);
     EPBuffers().init();
     USBCore().buildDeviceConfigDescriptor();
@@ -554,10 +662,33 @@ void USBCore_::setResetHook(void (*hook)())
     resetHook = hook;
 }
 
+#ifdef USBD_ERROR_HOOKS
+static void handleSetupErr(uint8_t len)
+{
+    USBCore().logEP('!', 0, '<', len);
+    usbd_ep_ram *btable_ep = (usbd_ep_ram *)(USBD_RAM + 2 * (BTABLE_OFFSET & 0xFFF8));
+    uint32_t *p = (uint32_t *)(USBD_RAM + 2U * EP0_RX_ADDR);
+    uint16_t buf[USBD_EP0_MAX_SIZE/2];
+    for (int i = 0; i < USBD_EP0_MAX_SIZE/2; i++) {
+        buf[i] = p[i];
+    }
+    USBCore().hexDump('!', (uint8_t *)buf, USBD_EP0_MAX_SIZE);
+    auto bytes = (uint16_t)(btable_ep[0].rx_count & EPRCNT_CNT);
+    USBCore().logEP('.', 0, '!', bytes);
+}
+
+static void handleErr()
+{
+    USBCore().logStatus("Error");
+    USBCore().nerror++;
+}
+#endif
+
 void (*oldSuspendHandler)();
 void handleSuspend()
 {
     USBCore().logStatus("Suspend");
+    USBCore().nsusp++;
     oldSuspendHandler();
 }
 
@@ -567,6 +698,7 @@ void handleResume()
     usb_disable_interrupts();
     USBCore().logStatus("Resume");
     usb_enable_interrupts();
+    USBCore().nresume++;
     oldResumeHandler();
 }
 
@@ -584,6 +716,11 @@ USBCore_::USBCore_()
 
     oldResetHandler = usbd.drv_handler->ep_reset;
     usbd.drv_handler->ep_reset = handleReset;
+
+#ifdef USBD_ERROR_HOOKS
+    usbd.drv_handler->err = handleErr;
+    usbd.drv_handler->setup_err = handleSetupErr;
+#endif
 
     oldSuspendHandler = usbd.drv_handler->suspend;
     usbd.drv_handler->suspend = handleSuspend;
@@ -842,6 +979,11 @@ int USBCore_::flush(uint8_t ep)
         EPBuffers().buf(ep).flush();
     }
     return 0;
+}
+
+void USBCore_::setTimeout(uint8_t ep, uint16_t timeout)
+{
+    EPBuffers().buf(ep).setTimeout(timeout);
 }
 
 void USBCore_::transcSetupHelper(usb_dev* usbd, uint8_t ep)
