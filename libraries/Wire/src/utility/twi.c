@@ -434,6 +434,31 @@ static int i2c_byte_read(i2c_t *obj, int last)
  * @param stop    Stop to be generated after the transfer is done
  * @return status
  */
+/*
+ * This contains a workaround for a hardware erratum:
+ *
+ * If RBNE is set, but BTC is cleared, and the read of I2C_DATA is delayed
+ * (e.g., by an interrupt) long enough that BTC becomes set, but I2C_STAT0
+ * isn't read again again after BTC is set, the read of I2C_DATA won't reset
+ * BTC.
+ *
+ * This means that BTC remains set, and the hardware copies the shift register
+ * into I2C_DATA as usual, but the hardware stretches the clock until BTC is
+ * cleared. This causes software to read an incorrect duplicate byte.
+ *
+ * Example: Byte I arrives. Hardware sets RBNE. Software reads I2C_STAT0. Byte
+ * I+1 arrives. Hardware sets BTC and stretches clock. Software reads byte I
+ * from I2C_DATA. Hardware copies byte I+1 to I2C_DATA, but does not clear BTC,
+ * because I2C_STAT0 wasn't read after BTC was set. RBNE remains set, because
+ * there is still valid data in I2C_DATA. In its next iteration, software reads
+ * I2C_STAT0. Both RBNE and BTC remain set. Software reads byte I+1 from
+ * I2C_DATA, causing hardware to clear both RBNE and BTC. This resumes the
+ * clock, and hardware copies the shift register to I2C_DATA as usual.
+ *
+ * However, this copy apparently contains another copy of byte I+1, instead of
+ * the expected I+2, because the hardware stretched the clock when BTC remained
+ * set; therefore, it has not yet read byte I+2.
+ */
 i2c_status_enum i2c_master_receive(i2c_t *obj, uint8_t address, uint8_t *data, uint16_t length,
                                    int stop)
 {
@@ -469,17 +494,23 @@ i2c_status_enum i2c_master_receive(i2c_t *obj, uint8_t address, uint8_t *data, u
         if (ret != I2C_OK) {
             break;
         }
+        if ((uint32_t)length - count >= 2) {
+            /* Wait for both data register and shift register to be full */
+            /*
+             * Always do this, to work around erratum mentioned above.
+             * Yes, this delays reading of the first byte, and might slightly
+             * increase clock stretching, but it avoids the erratum.
+             */
+            ret = i2c_wait_flag(obj, I2C_STAT0_BTC, WIRE_I2C_FLAG_TIMEOUT_DATA_ACK);
+        } else {
+            ret = i2c_wait_flag(obj, I2C_STAT0_RBNE, WIRE_I2C_FLAG_TIMEOUT_BYTE_RECEIVED);
+        }
         if (length > 2 && count == (uint32_t)length - 3) {
-            /* Wait for both data register and shift register to be full */
-            ret = i2c_wait_flag(obj, I2C_STAT0_BTC, WIRE_I2C_FLAG_TIMEOUT_DATA_ACK);
+            /* If 3 bytes remain, disable ACK before reading anything more */
+            /* Lengths less than 3 had NACK configuration done earlier */
             i2c_ack_config(obj->i2c, I2C_ACK_DISABLE);
-        } else if (2 == length && count == 0) {
-            /* Wait for both data register and shift register to be full */
-            ret = i2c_wait_flag(obj, I2C_STAT0_BTC, WIRE_I2C_FLAG_TIMEOUT_DATA_ACK);
-            /* For this length, NACK was already configured before START */
         }
 
-        ret = i2c_wait_flag(obj, I2C_STAT0_RBNE, WIRE_I2C_FLAG_TIMEOUT_BYTE_RECEIVED);
         if (ret == I2C_OK) {
             data[count] = i2c_data_receive(obj->i2c);
         }
