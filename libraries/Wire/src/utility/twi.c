@@ -68,8 +68,9 @@ static struct i2c_s *obj_s_buf[I2C_NUM] = {NULL};
 #define WIRE_I2C_FLAG_TIMEOUT_START WIRE_I2C_FLAG_TIMEOUT
 #endif
 
+/* Because some targets stretch the clock after ACKing the last byte */
 #ifndef WIRE_I2C_FLAG_TIMEOUT_STOP_BIT_RESET
-#define WIRE_I2C_FLAG_TIMEOUT_STOP_BIT_RESET WIRE_I2C_FLAG_TIMEOUT
+#define WIRE_I2C_FLAG_TIMEOUT_STOP_BIT_RESET WIRE_I2C_ACK_TIMEOUT
 #endif
 
 #ifndef WIRE_I2C_FLAG_TIMEOUT_ADDR_ACK
