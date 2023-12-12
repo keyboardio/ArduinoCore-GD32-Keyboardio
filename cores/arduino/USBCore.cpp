@@ -302,8 +302,24 @@ void EPBuffer<L>::enableOutEndpoint()
 template<size_t L>
 void EPBuffer<L>::transcOut()
 {
-    this->tail = this->buf + USBCore().usbDev().transc_out[this->ep].xfer_count;;
+    auto count = USBCore().usbDev().transc_out[this->ep].xfer_count;
+    this->tail = this->buf + count;
+    // Reset rxWaiting now so enableOutEndpoint works properly for ZLPs
     this->rxWaiting = false;
+    if (count == 0) {
+        /*
+         * Got a ZLP; re-enable endpoint so we don't stop accepting input! If
+         * the application is polling available() instead of calling recv(), it
+         * would otherwise never execute pop(). This means that the endpoint
+         * would remain disabled, and the driver would keep sending NAK to the
+         * host when the host sends more data, causing an apparent lockup.
+         *
+         * Background: Hosts can send a ZLP if sending data that's exactly a
+         * multiple of wMaxPacketSize (which is 64 bytes for full-speed USB).
+         * At least some versions of macOS do this.
+         */
+        this->enableOutEndpoint();
+    }
 }
 
 // Must be called via ISR
