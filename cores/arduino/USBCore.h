@@ -123,6 +123,9 @@ class EPBuffer
         /* whether the buf contents are already waiting on another flush */
         volatile bool pendingFlush = false;
 
+        /* whether flushing an empty buffer will result in a ZLP */
+        volatile bool sendZLP = false;
+
         uint8_t ep;
 };
 
