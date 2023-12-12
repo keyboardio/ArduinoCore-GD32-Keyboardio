@@ -139,6 +139,7 @@ void EPBuffer<L>::init(uint8_t ep)
     this->pendingFlush = false;
     this->rxWaiting = false;
     this->txWaiting = false;
+    this->sendZLP = false;
 }
 
 template<size_t L>
@@ -217,8 +218,8 @@ template<size_t L>
 void EPBuffer<L>::flush()
 {
     assert(this->ep != 0);
-    // Don't flush an empty buffer
-    if (this->len() == 0) {
+    // Don't flush an empty buffer, unless sending a ZLP
+    if (this->len() == 0 && !this->sendZLP) {
         return;
     }
     /*
@@ -251,6 +252,26 @@ void EPBuffer<L>::flush()
             return;
         } else {
             this->txWaiting = true;
+            /*
+             * If this packet is full, allow the next flush to send a ZLP.
+             * This signals end of transmission to some hosts that might not
+             * signal a completed read if the most recent packet is full.
+             *
+             * Some versions of Windows apparently need this.
+             *
+             * XXX This should check the declared endpoint wMaxPacketSize,
+             * not the allocated buffer size, but so should some other stuff.
+             *
+             * XXX Theoretically, some applications might not want this
+             * behavior, but the AVR core sends excess ZLPs instead, and this
+             * doesn't seem to cause obvious problems.
+             */
+            if (this->len() == L) {
+                this->sendZLP = true;
+            } else {
+                // Don't send multiple ZLPs in a row
+                this->sendZLP = false;
+            }
             usbd_ep_send(&USBCore().usbDev(), this->ep, (uint8_t *)this->buf, this->len());
             USBCore().logEP('>', this->ep, '>', this->len());
         }
