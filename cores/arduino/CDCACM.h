@@ -102,6 +102,7 @@ class CDCACM_ : public Stream
         size_t write(const uint8_t* d, size_t len);
         void flush();
         using Print::write;
+        void ctlIn();
 
     private:
         uint8_t acmInterface;
@@ -130,6 +131,7 @@ class CDCACM_ : public Stream
         // We only store one octet, but up to 16 bits to have a flag that
         // specifies whether or not a character has been read.
         volatile int16_t peekBuffer = -1;
+        bool do_reboot = false;
 };
 
 #ifdef USBD_USE_CDC

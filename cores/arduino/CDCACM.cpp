@@ -69,13 +69,29 @@ bool CDCACM_::setup(arduino::USBSetup& setup)
             this->lineState = setup.wValueL;
             // Bit 0 of lineState is DTR
             if ((this->lineState & 0x1) == 0 && this->lc.lineCoding.dwDTERate == 1200) {
-                // Reset on "1200bps touch" from Arduino
-                NVIC_SystemReset();
+                /*
+                 * Reset on "1200bps touch" from Arduino.
+                 *
+                 * Defer the actual reboot to ctlIn, so the status handshake
+                 * completes. This prevents some spurious error messages
+                 * during flashing on some versions of Linux.
+                 */
+                do_reboot = true;
             }
         }
         return true;
     }
     return false;
+}
+
+/* Reboot, deferred from setup() */
+void CDCACM_::ctlIn()
+{
+    if (!do_reboot) {
+        return;
+    }
+    USBCore().disconnect();
+    NVIC_SystemReset();
 }
 
 void CDCACM_::begin(uint32_t baud)
