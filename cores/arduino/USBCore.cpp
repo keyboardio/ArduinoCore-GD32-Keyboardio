@@ -511,6 +511,8 @@ class ClassCore
         static uint8_t ctlIn(usb_dev* usbd)
         {
             (void)usbd;
+            // CDCACM deferred action for 1200bps touch reboot
+            CDCACM().ctlIn();
             return REQ_SUPP;
         }
 
